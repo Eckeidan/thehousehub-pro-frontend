@@ -11,6 +11,9 @@ type PropertyImage = {
   sortOrder: number;
 };
 
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+
 export default function PropertyGallery({
   propertyId,
   images = [],
@@ -25,8 +28,6 @@ export default function PropertyGallery({
   const [previewOpen, setPreviewOpen] = useState(false);
   const [deleteImageId, setDeleteImageId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
-
-  const imageBase = "http://localhost:4000";
 
   const sortedImages = useMemo(
     () =>
@@ -52,6 +53,14 @@ export default function PropertyGallery({
     }
   }, [sortedImages, selected]);
 
+  const getImageSrc = (imageUrl: string) => {
+    if (!imageUrl) return "";
+    if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
+      return imageUrl;
+    }
+    return `${API_BASE}${imageUrl}`;
+  };
+
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files?.length) return;
@@ -65,7 +74,7 @@ export default function PropertyGallery({
       Array.from(files).forEach((file) => formData.append("images", file));
 
       const res = await fetch(
-        `http://localhost:4000/api/property-images/property/${propertyId}`,
+        `${API_BASE}/api/property-images/property/${propertyId}`,
         {
           method: "POST",
           headers: {
@@ -101,7 +110,7 @@ export default function PropertyGallery({
       const token = localStorage.getItem("token");
 
       const res = await fetch(
-        `http://localhost:4000/api/property-images/${imageId}/primary`,
+        `${API_BASE}/api/property-images/${imageId}/primary`,
         {
           method: "PUT",
           headers: {
@@ -137,7 +146,7 @@ export default function PropertyGallery({
       const token = localStorage.getItem("token");
 
       const res = await fetch(
-        `http://localhost:4000/api/property-images/${deleteImageId}`,
+        `${API_BASE}/api/property-images/${deleteImageId}`,
         {
           method: "DELETE",
           headers: {
@@ -201,7 +210,7 @@ export default function PropertyGallery({
                 onClick={() => setPreviewOpen(true)}
               >
                 <img
-                  src={`${imageBase}${selected.imageUrl}`}
+                  src={getImageSrc(selected.imageUrl)}
                   alt={selected.fileName || "Property image"}
                   className="h-full w-full cursor-zoom-in object-cover"
                 />
@@ -233,7 +242,7 @@ export default function PropertyGallery({
                     onClick={() => setSelected(image)}
                   >
                     <img
-                      src={`${imageBase}${image.imageUrl}`}
+                      src={getImageSrc(image.imageUrl)}
                       alt={image.fileName || "Thumbnail"}
                       className="h-full w-full object-cover"
                     />
@@ -297,7 +306,7 @@ export default function PropertyGallery({
             </button>
 
             <img
-              src={`${imageBase}${selected.imageUrl}`}
+              src={getImageSrc(selected.imageUrl)}
               alt={selected.fileName || "Property image"}
               className="max-h-[90vh] max-w-[95vw] rounded-2xl object-contain shadow-2xl"
             />
