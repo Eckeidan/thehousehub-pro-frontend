@@ -52,7 +52,6 @@ type NotificationState = {
 };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-const BACKEND_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 export default function NewDocumentPage() {
   const router = useRouter();
@@ -164,13 +163,13 @@ export default function NewDocumentPage() {
       const token = localStorage.getItem("token");
 
       const [propertiesRes, tenantsRes] = await Promise.all([
-        fetch(`${API_BASE}/properties`, {
+        fetch(`${API_BASE}/api/properties`, {
           cache: "no-store",
           headers: {
             Authorization: `Bearer ${token || ""}`,
           },
         }),
-        fetch(`${API_BASE}/tenants`, {
+        fetch(`${API_BASE}/api/tenants`, {
           cache: "no-store",
           headers: {
             Authorization: `Bearer ${token || ""}`,
@@ -270,7 +269,7 @@ export default function NewDocumentPage() {
       body.append("uploadedBy", form.uploadedBy.trim());
       body.append("notes", form.notes.trim());
 
-      const res = await fetch(`${API_BASE}/documents`, {
+      const res = await fetch(`${API_BASE}/api/documents`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token || ""}`,
