@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Eye, EyeOff, Lock, Mail } from "lucide-react";
 
@@ -22,8 +21,6 @@ type LoginResponse = {
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 export default function LoginPage() {
-  const router = useRouter();
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -55,46 +52,54 @@ export default function LoginPage() {
 
       if (contentType.includes("application/json")) {
         data = await res.json();
+        console.log("LOGIN RESPONSE:", data);
+        console.log("ROLE FOUND:", data?.user?.role);
+        console.log("TOKEN FOUND:", data?.token);
       } else {
         const rawText = await res.text();
         console.error("Non-JSON login response:", rawText);
         setError("Backend returned an invalid response. Check auth route or backend server.");
+        setLoading(false);
         return;
       }
 
       if (!res.ok) {
         setError(data.error || data.message || "Login failed.");
+        setLoading(false);
         return;
       }
 
-      if (data.token) {
-        localStorage.setItem("token", data.token);
+      if (!data?.token || !data?.user) {
+        setError("Invalid login response from server.");
+        setLoading(false);
+        return;
       }
 
-      if (data.user) {
-        localStorage.setItem("user", JSON.stringify(data.user));
-      }
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(data.user));
 
-      const role = String(data.user?.role || "").trim().toLowerCase();
+      const role = String(data.user.role || "").trim().toLowerCase();
 
       setSuccess("Login successful.");
 
-      if (role === "superadmin" || role === "admin") {
+      setTimeout(() => {
+        if (role === "admin") {
+          window.location.href = "/dashboard";
+          return;
+        }
+
+        if (role === "owner") {
+          window.location.href = "/owner";
+          return;
+        }
+
+        if (role === "tenant") {
+          window.location.href = "/tenant";
+          return;
+        }
+
         window.location.href = "/dashboard";
-        return;
-      }
-
-      if (role === "owner") {
-        window.location.href = "/owner";
-        return;
-      }
-
-      if (role === "tenant") {
-        window.location.href = "/tenant";
-        return;
-      }
-
-      window.location.href = "/dashboard";
+      }, 300);
     } catch (err) {
       console.error("Login error:", err);
       setError("Server error. Unable to connect to backend.");
@@ -233,7 +238,7 @@ export default function LoginPage() {
               <div className="mt-8 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
                 <p className="font-medium text-slate-700">Role-based access</p>
                 <p className="mt-1">
-                  SuperAdmin and Admin go to dashboard, owner goes to owner space,
+                  Admin goes to dashboard, owner goes to owner space,
                   tenant goes to tenant portal.
                 </p>
               </div>
