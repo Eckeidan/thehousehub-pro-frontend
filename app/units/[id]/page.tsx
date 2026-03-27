@@ -17,7 +17,7 @@ import {
   FileText,
 } from "lucide-react";
 
-const API_BASE = "http://localhost:4000/api";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 type Property = {
   id: string;
@@ -131,54 +131,81 @@ export default function UnitDetailsPage() {
   }, [id]);
 
   async function loadData() {
-    try {
-      setLoading(true);
-      setError("");
+  try {
+    setLoading(true);
+    setError("");
 
-      const unitRes = await fetch(`${API_BASE}/units/${id}`, {
-        cache: "no-store",
-      });
+    const token = localStorage.getItem("token");
 
-      const unitData = await unitRes.json();
+    const headers: HeadersInit = {
+      Authorization: `Bearer ${token || ""}`,
+    };
 
-      if (!unitRes.ok) {
-        throw new Error(unitData?.error || "Failed to load unit");
-      }
+    const unitRes = await fetch(`${API_BASE}/api/units/${id}`, {
+      cache: "no-store",
+      headers,
+    });
 
-      setUnit(unitData);
+    const unitData = await unitRes.json().catch(() => null);
 
-      const [tenantsRes, maintenanceRes] = await Promise.all([
-        fetch(`${API_BASE}/tenants`, { cache: "no-store" }),
-        fetch(`${API_BASE}/maintenance?unitId=${encodeURIComponent(id)}`, {
-          cache: "no-store",
-        }),
-      ]);
-
-      const tenantsData = await tenantsRes.json();
-      const maintenanceData = await maintenanceRes.json();
-
-      if (!tenantsRes.ok) {
-        throw new Error(tenantsData?.error || "Failed to load tenants");
-      }
-
-      if (!maintenanceRes.ok) {
-        throw new Error(
-          maintenanceData?.error || "Failed to load maintenance requests"
-        );
-      }
-
-      const allTenants = Array.isArray(tenantsData) ? tenantsData : [];
-      const unitTenants = allTenants.filter((tenant: Tenant) => tenant.unitId === id);
-      setTenants(unitTenants);
-
-      setMaintenance(Array.isArray(maintenanceData) ? maintenanceData : []);
-    } catch (err) {
-      console.error(err);
-      setError(err instanceof Error ? err.message : "Failed to load unit.");
-    } finally {
-      setLoading(false);
+    if (unitRes.status === 401) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      window.location.href = "/";
+      return;
     }
+
+    if (!unitRes.ok) {
+      throw new Error(unitData?.error || "Failed to load unit");
+    }
+
+    setUnit(unitData);
+
+    const [tenantsRes, maintenanceRes] = await Promise.all([
+      fetch(`${API_BASE}/api/tenants`, {
+        cache: "no-store",
+        headers,
+      }),
+      fetch(`${API_BASE}/api/maintenance?unitId=${encodeURIComponent(id)}`, {
+        cache: "no-store",
+        headers,
+      }),
+    ]);
+
+    const tenantsData = await tenantsRes.json().catch(() => null);
+    const maintenanceData = await maintenanceRes.json().catch(() => null);
+
+    if (tenantsRes.status === 401 || maintenanceRes.status === 401) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      window.location.href = "/";
+      return;
+    }
+
+    if (!tenantsRes.ok) {
+      throw new Error(tenantsData?.error || "Failed to load tenants");
+    }
+
+    if (!maintenanceRes.ok) {
+      throw new Error(
+        maintenanceData?.error || "Failed to load maintenance requests"
+      );
+    }
+
+    const allTenants = Array.isArray(tenantsData) ? tenantsData : [];
+    const unitTenants = allTenants.filter(
+      (tenant: Tenant) => tenant.unitId === id
+    );
+    setTenants(unitTenants);
+
+    setMaintenance(Array.isArray(maintenanceData) ? maintenanceData : []);
+  } catch (err) {
+    console.error(err);
+    setError(err instanceof Error ? err.message : "Failed to load unit.");
+  } finally {
+    setLoading(false);
   }
+}
 
   const currentTenant = useMemo(() => {
     return (
