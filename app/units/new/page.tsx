@@ -256,9 +256,9 @@ export default function NewUnitPage() {
       <div className="flex min-h-screen">
         <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 bg-gradient-to-b from-blue-950 via-blue-900 to-slate-900 text-white shadow-2xl lg:flex lg:flex-col">
           <div className="border-b border-white/10 px-6 py-7">
-            <h1 className="text-3xl font-bold tracking-tight">PropertyOS</h1>
+            <h1 className="text-3xl font-bold tracking-tight">The House Hub</h1>
             <p className="mt-2 text-sm text-blue-100/70">
-              Smart Property Management
+              The Morden home management platform.
             </p>
           </div>
 

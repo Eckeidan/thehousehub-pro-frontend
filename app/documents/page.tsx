@@ -69,8 +69,8 @@ type NotificationState = {
   message: string;
 };
 
-const API_BASE = "http://localhost:4000/api";
-const BACKEND_BASE = "http://localhost:4000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+const BACKEND_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 function formatDate(dateString: string) {
   if (!dateString) return "-";
@@ -197,7 +197,7 @@ export default function DocumentsPage() {
 
       const token = localStorage.getItem("token");
 
-      const res = await fetch(`${API_BASE}/documents`, {
+      const res = await fetch(`${API_BASE}/api/documents`, {
         cache: "no-store",
         headers: {
           Authorization: `Bearer ${token || ""}`,
@@ -243,7 +243,7 @@ export default function DocumentsPage() {
 
       const token = localStorage.getItem("token");
 
-      const res = await fetch(`${API_BASE}/documents/${documentToDelete.id}`, {
+      const res = await fetch(`${API_BASE}/api/documents/${documentToDelete.id}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token || ""}`,
@@ -289,55 +289,55 @@ export default function DocumentsPage() {
   }
 
   async function handleDownload(doc: DocumentItem) {
-  try {
-    const token = localStorage.getItem("token");
-    const fileUrl = `${BACKEND_BASE}${doc.fileUrl}`;
+    try {
+      const token = localStorage.getItem("token");
+      const fileUrl = `${BACKEND_BASE}${doc.fileUrl}`;
 
-    const res = await fetch(fileUrl, {
-      headers: {
-        Authorization: `Bearer ${token || ""}`,
-      },
-    });
+      const res = await fetch(fileUrl, {
+        headers: {
+          Authorization: `Bearer ${token || ""}`,
+        },
+      });
 
-    if (res.status === 401) {
-      handleUnauthorized();
-      return;
-    }
+      if (res.status === 401) {
+        handleUnauthorized();
+        return;
+      }
 
-    if (!res.ok) {
+      if (!res.ok) {
+        showNotification(
+          "error",
+          "Unable to download document",
+          "The file could not be downloaded."
+        );
+        return;
+      }
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+
+      const extension =
+        doc.fileUrl?.split(".").pop()?.split("?")[0] || "file";
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = doc.documentName
+        ? `${doc.documentName}.${extension}`
+        : `document.${extension}`;
+
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      window.URL.revokeObjectURL(url);
+    } catch (error: any) {
       showNotification(
         "error",
         "Unable to download document",
-        "The file could not be downloaded."
+        error?.message || "The file could not be downloaded."
       );
-      return;
     }
-
-    const blob = await res.blob();
-    const url = window.URL.createObjectURL(blob);
-
-    const extension =
-      doc.fileUrl?.split(".").pop()?.split("?")[0] || "file";
-
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = doc.documentName
-      ? `${doc.documentName}.${extension}`
-      : `document.${extension}`;
-
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-
-    window.URL.revokeObjectURL(url);
-  } catch (error: any) {
-    showNotification(
-      "error",
-      "Unable to download document",
-      error?.message || "The file could not be downloaded."
-    );
   }
-}
 
   const filteredDocuments = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -417,7 +417,7 @@ export default function DocumentsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-300">
+    <div className="min-h-screen bg-slate-50 text-slate-900">
       {notification.open && (
         <div className="fixed right-6 top-6 z-[110] w-full max-w-md animate-[slideIn_.25s_ease-out]">
           <div
@@ -562,9 +562,9 @@ export default function DocumentsPage() {
 
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 bg-gradient-to-b from-blue-950 via-blue-900 to-slate-900 text-white shadow-2xl lg:flex lg:flex-col">
         <div className="border-b border-white/10 px-6 py-7">
-          <h1 className="text-3xl font-bold tracking-tight">PropertyOS</h1>
+          <h1 className="text-3xl font-bold tracking-tight">The House Hub</h1>
           <p className="mt-2 text-sm text-blue-100/70">
-            Smart Property Management
+            The modern home management platform.
           </p>
         </div>
 
@@ -839,8 +839,8 @@ export default function DocumentsPage() {
                             {doc.tenant
                               ? "Tenant"
                               : doc.property
-                              ? "Property"
-                              : "Unlinked"}
+                                ? "Property"
+                                : "Unlinked"}
                           </div>
                         </td>
 

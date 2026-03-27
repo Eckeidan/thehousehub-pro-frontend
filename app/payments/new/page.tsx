@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   LayoutDashboard,
   Building2,
@@ -12,7 +12,6 @@ import {
   Settings,
   Plus,
   ArrowLeft,
-  RefreshCw,
   Wrench,
   Home,
   X,
@@ -31,26 +30,6 @@ type StoredUser = {
   role?: string;
 };
 
-type LeaseOption = {
-  id: string;
-  rentAmount: number;
-  status: string;
-  startDate: string;
-  endDate?: string | null;
-  tenant?: {
-    firstName: string;
-    lastName: string;
-  } | null;
-  unit?: {
-    unitCode: string;
-    unitName?: string | null;
-  } | null;
-  property?: {
-    code: string;
-    name?: string | null;
-  } | null;
-};
-
 type NotificationState = {
   open: boolean;
   type: "success" | "error";
@@ -58,23 +37,13 @@ type NotificationState = {
   message: string;
 };
 
-const API_BASE = "http://localhost:4000/api";
-
-function formatCurrency(amount: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(amount || 0);
-}
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 export default function NewPaymentPage() {
   const router = useRouter();
 
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [user, setUser] = useState<StoredUser | null>(null);
-
-  const [leases, setLeases] = useState<LeaseOption[]>([]);
-  const [loadingLeases, setLoadingLeases] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
   const [notification, setNotification] = useState<NotificationState>({
@@ -85,7 +54,6 @@ export default function NewPaymentPage() {
   });
 
   const [form, setForm] = useState({
-    leaseId: "",
     amount: "",
     paymentDate: new Date().toISOString().split("T")[0],
     paymentMethod: "CASH",
@@ -139,67 +107,6 @@ export default function NewPaymentPage() {
     }
   }, [router]);
 
-  async function fetchLeases() {
-    try {
-      setLoadingLeases(true);
-
-      const token = localStorage.getItem("token");
-
-      const res = await fetch(`${API_BASE}/leases`, {
-        cache: "no-store",
-        headers: {
-          Authorization: `Bearer ${token || ""}`,
-        },
-      });
-
-      if (res.status === 401) {
-        handleUnauthorized();
-        return;
-      }
-
-      const data = await res.json().catch(() => null);
-
-      if (!res.ok) {
-        throw new Error(data?.error || "Failed to load leases");
-      }
-
-      const activeLeases = Array.isArray(data)
-        ? data.filter((lease) => lease.status === "ACTIVE")
-        : [];
-
-      setLeases(activeLeases);
-    } catch (error: any) {
-      console.error("Failed to fetch leases:", error);
-      setLeases([]);
-      showNotification(
-        "error",
-        "Unable to load leases",
-        error?.message ||
-          "Active leases could not be loaded. Please refresh and try again."
-      );
-    } finally {
-      setLoadingLeases(false);
-    }
-  }
-
-  useEffect(() => {
-    if (checkingAuth) return;
-    fetchLeases();
-  }, [checkingAuth]);
-
-  const selectedLease = useMemo(() => {
-    return leases.find((lease) => lease.id === form.leaseId) || null;
-  }, [leases, form.leaseId]);
-
-  useEffect(() => {
-    if (selectedLease && !form.amount) {
-      setForm((prev) => ({
-        ...prev,
-        amount: String(selectedLease.rentAmount || ""),
-      }));
-    }
-  }, [selectedLease, form.amount]);
-
   useEffect(() => {
     if (!notification.open) return;
 
@@ -227,11 +134,11 @@ export default function NewPaymentPage() {
     e.preventDefault();
     setNotification((prev) => ({ ...prev, open: false }));
 
-    if (!form.leaseId || !form.amount || !form.paymentDate) {
+    if (!form.amount || !form.paymentDate) {
       showNotification(
         "error",
         "Missing required fields",
-        "Lease, amount, and payment date are required."
+        "Amount and payment date are required."
       );
       return;
     }
@@ -241,14 +148,13 @@ export default function NewPaymentPage() {
 
       const token = localStorage.getItem("token");
 
-      const res = await fetch(`${API_BASE}/payments`, {
+      const res = await fetch(`${API_BASE}/api/payments`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token || ""}`,
         },
         body: JSON.stringify({
-          leaseId: form.leaseId,
           amount: Number(form.amount),
           paymentDate: form.paymentDate,
           paymentMethod: form.paymentMethod,
@@ -501,73 +407,28 @@ export default function NewPaymentPage() {
 
       <main className="min-h-screen px-6 py-8 lg:pl-[352px] lg:pr-10">
         <div className="mx-auto max-w-5xl">
-          <div className="mb-8 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-            <div>
-              <div className="mb-4">
-                <Link
-                  href="/payments"
-                  className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Back to Payments
-                </Link>
-              </div>
-
-              <h2 className="text-5xl font-bold tracking-tight text-slate-900">
-                New Payment
-              </h2>
-              <p className="mt-3 text-xl text-slate-500">
-                Record a rent payment for an active lease.
-              </p>
+          <div className="mb-8">
+            <div className="mb-4">
+              <Link
+                href="/payments"
+                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to Payments
+              </Link>
             </div>
 
-            <button
-              onClick={fetchLeases}
-              type="button"
-              className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Refresh Leases
-            </button>
+            <h2 className="text-5xl font-bold tracking-tight text-slate-900">
+              New Payment
+            </h2>
+            <p className="mt-3 text-xl text-slate-500">
+              Record a payment manually.
+            </p>
           </div>
 
           <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm lg:p-8">
             <form onSubmit={handleSubmit} className="space-y-8">
               <div className="grid gap-6 md:grid-cols-2">
-                <div className="md:col-span-2">
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">
-                    Lease
-                  </label>
-                  <select
-                    value={form.leaseId}
-                    onChange={(e) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        leaseId: e.target.value,
-                        amount: "",
-                      }))
-                    }
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-[15px] text-slate-700 outline-none transition focus:border-[#1f3270] focus:bg-white"
-                    disabled={loadingLeases}
-                  >
-                    <option value="">
-                      {loadingLeases
-                        ? "Loading active leases..."
-                        : "Select an active lease"}
-                    </option>
-                    {leases.map((lease) => (
-                      <option key={lease.id} value={lease.id}>
-                        {lease.tenant
-                          ? `${lease.tenant.firstName} ${lease.tenant.lastName}`
-                          : "Unknown Tenant"}{" "}
-                        — {lease.property?.code || "-"} /{" "}
-                        {lease.unit?.unitCode || "-"} —{" "}
-                        {formatCurrency(lease.rentAmount)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
                 <div>
                   <label className="mb-2 block text-sm font-semibold text-slate-700">
                     Amount
@@ -676,46 +537,6 @@ export default function NewPaymentPage() {
                   />
                 </div>
               </div>
-
-              {selectedLease ? (
-                <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
-                  <h3 className="text-lg font-semibold text-slate-900">
-                    Selected Lease Summary
-                  </h3>
-                  <div className="mt-4 grid gap-4 md:grid-cols-2">
-                    <div>
-                      <p className="text-sm text-slate-500">Tenant</p>
-                      <p className="mt-1 font-medium text-slate-900">
-                        {selectedLease.tenant
-                          ? `${selectedLease.tenant.firstName} ${selectedLease.tenant.lastName}`
-                          : "Unknown"}
-                      </p>
-                    </div>
-
-                    <div>
-                      <p className="text-sm text-slate-500">Property / Unit</p>
-                      <p className="mt-1 font-medium text-slate-900">
-                        {selectedLease.property?.code || "-"} /{" "}
-                        {selectedLease.unit?.unitCode || "-"}
-                      </p>
-                    </div>
-
-                    <div>
-                      <p className="text-sm text-slate-500">Rent Amount</p>
-                      <p className="mt-1 font-medium text-slate-900">
-                        {formatCurrency(selectedLease.rentAmount)}
-                      </p>
-                    </div>
-
-                    <div>
-                      <p className="text-sm text-slate-500">Lease Status</p>
-                      <p className="mt-1 font-medium text-slate-900">
-                        {selectedLease.status}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
 
               <div className="flex flex-wrap gap-3">
                 <button

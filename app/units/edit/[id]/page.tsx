@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Loader2, Pencil, Save } from "lucide-react";
 
-const API_BASE = "http://localhost:4000/api";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 type Property = {
   id: string;
@@ -75,18 +75,37 @@ export default function EditUnitPage() {
     }
   }, [id]);
 
-  const loadData = async () => {
+  async function loadData() {
     try {
       setLoading(true);
       setErrorMessage("");
 
+      const token = localStorage.getItem("token");
+
+      const headers: HeadersInit = {
+        Authorization: `Bearer ${token || ""}`,
+      };
+
       const [unitRes, propertiesRes] = await Promise.all([
-        fetch(`${API_BASE}/units/${id}`, { cache: "no-store" }),
-        fetch(`${API_BASE}/properties`, { cache: "no-store" }),
+        fetch(`${API_BASE}/api/units/${id}`, {
+          cache: "no-store",
+          headers,
+        }),
+        fetch(`${API_BASE}/api/properties`, {
+          cache: "no-store",
+          headers,
+        }),
       ]);
 
-      const unitData = await unitRes.json();
-      const propertiesData = await propertiesRes.json();
+      if (unitRes.status === 401 || propertiesRes.status === 401) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        router.replace("/");
+        return;
+      }
+
+      const unitData = await unitRes.json().catch(() => null);
+      const propertiesData = await propertiesRes.json().catch(() => null);
 
       if (!unitRes.ok) {
         throw new Error(unitData?.error || "Failed to load unit");
@@ -103,7 +122,10 @@ export default function EditUnitPage() {
         propertyId: unit.propertyId || "",
         unitCode: unit.unitCode || "",
         unitName: unit.unitName || "",
-        floor: unit.floor !== null && unit.floor !== undefined ? String(unit.floor) : "",
+        floor:
+          unit.floor !== null && unit.floor !== undefined
+            ? String(unit.floor)
+            : "",
         bedrooms:
           unit.bedrooms !== null && unit.bedrooms !== undefined
             ? String(unit.bedrooms)
@@ -130,7 +152,7 @@ export default function EditUnitPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -168,6 +190,8 @@ export default function EditUnitPage() {
       setErrorMessage("");
       setSuccessMessage("");
 
+      const token = localStorage.getItem("token");
+
       const payload = {
         propertyId: form.propertyId,
         unitCode: form.unitCode.trim(),
@@ -182,13 +206,21 @@ export default function EditUnitPage() {
         notes: form.notes.trim() || null,
       };
 
-      const res = await fetch(`${API_BASE}/units/${id}`, {
+      const res = await fetch(`${API_BASE}/api/units/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token || ""}`,
         },
         body: JSON.stringify(payload),
       });
+
+      if (res.status === 401) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        router.replace("/");
+        return;
+      }
 
       const rawText = await res.text();
 
