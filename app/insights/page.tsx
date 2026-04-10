@@ -29,8 +29,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL || "https://propertyos-backend.onrender.com/api";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://propertyos-backend.onrender.com/api";
 
 type StoredUser = {
   id?: string;
