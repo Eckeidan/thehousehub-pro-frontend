@@ -14,7 +14,6 @@ import {
   Sparkles,
   ArrowLeft,
   ArrowRight,
-  UserCircle2,
   Clock3,
   AlertTriangle,
   CheckCircle2,
@@ -24,6 +23,10 @@ import {
   MapPin,
   ShieldCheck,
   Plus,
+  Pencil,
+  BadgeDollarSign,
+  UserCircle2,
+  Building2,
 } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
@@ -66,6 +69,8 @@ type MaintenanceRequest = {
   locationNote?: string | null;
   preferredDate?: string | null;
   entryPermission?: boolean;
+  estimatedCost?: number | string | null;
+  actualCost?: number | string | null;
   createdAt: string;
   updatedAt: string;
   property?: {
@@ -85,6 +90,12 @@ type MaintenanceRequest = {
     firstName?: string | null;
     lastName?: string | null;
   } | null;
+  contractor?: {
+    id: string;
+    companyName?: string | null;
+    phone?: string | null;
+    serviceCategory?: string | null;
+  } | null;
 };
 
 function formatDate(value?: string | null) {
@@ -94,6 +105,17 @@ function formatDate(value?: string | null) {
     month: "short",
     day: "numeric",
   });
+}
+
+function formatMoney(value?: number | string | null) {
+  if (value === null || value === undefined || value === "") return "Pending";
+  const amount = Number(value);
+  if (Number.isNaN(amount)) return String(value);
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(amount);
 }
 
 function getInitials(name?: string | null) {
@@ -254,15 +276,24 @@ export default function TenantMaintenancePage() {
 
       const maintenanceRes = await fetch(`${API_URL}/api/maintenance`, {
         cache: "no-store",
+        headers: {
+          Authorization: `Bearer ${token || ""}`,
+        },
       });
 
       const maintenanceData = await maintenanceRes.json().catch(() => []);
-
       const tenantId = currentUser?.tenant?.id || currentUser?.tenantId;
 
       const tenantRequests = Array.isArray(maintenanceData)
-        ? maintenanceData.filter((item: MaintenanceRequest) => item?.tenant?.id === tenantId)
+        ? maintenanceData.filter(
+            (item: MaintenanceRequest) => item?.tenant?.id === tenantId
+          )
         : [];
+
+      tenantRequests.sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
 
       setRequests(tenantRequests);
     } catch (err: any) {
@@ -314,10 +345,13 @@ export default function TenantMaintenancePage() {
         locationNote: form.locationNote.trim() || null,
       };
 
+      const token = localStorage.getItem("token");
+
       const res = await fetch(`${API_URL}/api/maintenance`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token || ""}`,
         },
         body: JSON.stringify(payload),
       });
@@ -356,21 +390,31 @@ export default function TenantMaintenancePage() {
 
   const initials = getInitials(fullName);
 
-  const openCount = useMemo(() => {
-    return requests.filter((r) => r.status === "OPEN").length;
-  }, [requests]);
+  const openCount = useMemo(
+    () => requests.filter((r) => r.status === "OPEN").length,
+    [requests]
+  );
 
-  const inProgressCount = useMemo(() => {
-    return requests.filter((r) => r.status === "IN_PROGRESS").length;
-  }, [requests]);
+  const inProgressCount = useMemo(
+    () => requests.filter((r) => r.status === "IN_PROGRESS").length,
+    [requests]
+  );
 
-  const resolvedCount = useMemo(() => {
-    return requests.filter((r) => r.status === "RESOLVED" || r.status === "CLOSED").length;
-  }, [requests]);
+  const resolvedCount = useMemo(
+    () =>
+      requests.filter(
+        (r) => r.status === "RESOLVED" || r.status === "CLOSED"
+      ).length,
+    [requests]
+  );
 
-  const urgentCount = useMemo(() => {
-    return requests.filter((r) => r.priority === "URGENT" || r.priority === "HIGH").length;
-  }, [requests]);
+  const urgentCount = useMemo(
+    () =>
+      requests.filter(
+        (r) => r.priority === "URGENT" || r.priority === "HIGH"
+      ).length,
+    [requests]
+  );
 
   const latestRequest = requests.length > 0 ? requests[0] : null;
 
@@ -389,7 +433,9 @@ export default function TenantMaintenancePage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#f4f7fb] p-6">
         <div className="w-full max-w-xl rounded-3xl border border-rose-200 bg-white p-8 shadow-xl">
-          <h2 className="text-2xl font-bold text-rose-600">Unable to load maintenance</h2>
+          <h2 className="text-2xl font-bold text-rose-600">
+            Unable to load maintenance
+          </h2>
           <p className="mt-3 text-slate-600">{error}</p>
           <button
             onClick={loadMaintenanceData}
@@ -408,7 +454,9 @@ export default function TenantMaintenancePage() {
         <aside className="hidden w-80 shrink-0 flex-col justify-between bg-gradient-to-b from-[#102a67] via-[#173d8e] to-[#0f1f45] text-white shadow-2xl lg:flex">
           <div>
             <div className="border-b border-white/10 px-8 py-8">
-              <h1 className="text-3xl font-bold tracking-tight">The House Hub</h1>
+              <h1 className="text-3xl font-bold tracking-tight">
+                The House Hub
+              </h1>
               <p className="mt-2 text-sm text-blue-100/70">
                 Premium Tenant Workspace
               </p>
@@ -436,11 +484,32 @@ export default function TenantMaintenancePage() {
               </p>
 
               <div className="space-y-2">
-                <SidebarItem label="Overview" icon={<Home size={18} />} href="/tenant" />
-                <SidebarItem label="Payments" icon={<CreditCard size={18} />} href="/tenant/payments" />
-                <SidebarItem label="Maintenance" icon={<Wrench size={18} />} active href="/tenant/maintenance" />
-                <SidebarItem label="Documents" icon={<FileText size={18} />} href="/tenant/documents" />
-                <SidebarItem label="Notifications" icon={<Bell size={18} />} href="/tenant/notifications" />
+                <SidebarItem
+                  label="Overview"
+                  icon={<Home size={18} />}
+                  href="/tenant"
+                />
+                <SidebarItem
+                  label="Payments"
+                  icon={<CreditCard size={18} />}
+                  href="/tenant/payments"
+                />
+                <SidebarItem
+                  label="Maintenance"
+                  icon={<Wrench size={18} />}
+                  active
+                  href="/tenant/maintenance"
+                />
+                <SidebarItem
+                  label="Documents"
+                  icon={<FileText size={18} />}
+                  href="/tenant/documents"
+                />
+                <SidebarItem
+                  label="Notifications"
+                  icon={<Bell size={18} />}
+                  href="/tenant/notifications"
+                />
               </div>
             </nav>
           </div>
@@ -477,8 +546,8 @@ export default function TenantMaintenancePage() {
                   Maintenance Requests
                 </h2>
                 <p className="mt-3 max-w-3xl text-base leading-7 text-slate-500">
-                  Follow your maintenance requests, check their progress, and submit
-                  new issues directly from your tenant workspace.
+                  Follow your maintenance requests, check their progress, and
+                  submit new issues directly from your tenant workspace.
                 </p>
               </div>
 
@@ -544,7 +613,8 @@ export default function TenantMaintenancePage() {
                       Request History
                     </h3>
                     <p className="mt-1 text-sm text-slate-500">
-                      View all maintenance requests linked to your tenant account.
+                      View all maintenance requests linked to your tenant
+                      account.
                     </p>
                   </div>
                 </div>
@@ -564,7 +634,7 @@ export default function TenantMaintenancePage() {
                               {getStatusIcon(item.status)}
                             </div>
 
-                            <div>
+                            <div className="flex-1">
                               <div className="flex flex-wrap items-center gap-2">
                                 <h4 className="text-lg font-semibold text-slate-900">
                                   {item.title}
@@ -602,11 +672,16 @@ export default function TenantMaintenancePage() {
                                 />
                                 <InfoPill
                                   icon={<Wrench className="h-4 w-4" />}
-                                  text={`Category: ${item.category?.replaceAll("_", " ")}`}
+                                  text={`Category: ${item.category?.replaceAll(
+                                    "_",
+                                    " "
+                                  )}`}
                                 />
                                 <InfoPill
                                   icon={<MapPin className="h-4 w-4" />}
-                                  text={`Unit: ${item.unit?.unitCode || "N/A"}`}
+                                  text={`Unit: ${
+                                    item.unit?.unitCode || "N/A"
+                                  }`}
                                 />
                                 <InfoPill
                                   icon={<ShieldCheck className="h-4 w-4" />}
@@ -617,10 +692,26 @@ export default function TenantMaintenancePage() {
                                   }
                                 />
                               </div>
+
+                              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                                <InfoPill
+                                  icon={<UserCircle2 className="h-4 w-4" />}
+                                  text={`Contractor: ${
+                                    item.contractor?.companyName ||
+                                    "Not assigned yet"
+                                  }`}
+                                />
+                                <InfoPill
+                                  icon={<BadgeDollarSign className="h-4 w-4" />}
+                                  text={`Estimate: ${formatMoney(
+                                    item.estimatedCost
+                                  )}`}
+                                />
+                              </div>
                             </div>
                           </div>
 
-                          <div className="flex shrink-0 items-center">
+                          <div className="flex shrink-0 flex-wrap items-center gap-2">
                             <Link
                               href={`/tenant/maintenance/${item.id}`}
                               className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
@@ -628,6 +719,16 @@ export default function TenantMaintenancePage() {
                               View
                               <ArrowRight className="h-4 w-4" />
                             </Link>
+
+                            {item.status === "OPEN" && (
+                              <Link
+                                href={`/tenant/maintenance/edit/${item.id}`}
+                                className="inline-flex items-center gap-2 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 shadow-sm transition hover:bg-blue-100"
+                              >
+                                <Pencil className="h-4 w-4" />
+                                Edit
+                              </Link>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -663,9 +764,15 @@ export default function TenantMaintenancePage() {
                         "N/A"
                       }
                     />
-                    <SummaryRow label="Total Requests" value={String(requests.length)} />
+                    <SummaryRow
+                      label="Total Requests"
+                      value={String(requests.length)}
+                    />
                     <SummaryRow label="Open" value={String(openCount)} />
-                    <SummaryRow label="Resolved" value={String(resolvedCount)} />
+                    <SummaryRow
+                      label="Resolved"
+                      value={String(resolvedCount)}
+                    />
                   </div>
                 </div>
 
@@ -680,10 +787,15 @@ export default function TenantMaintenancePage() {
                   {latestRequest ? (
                     <div className="mt-6 rounded-3xl bg-gradient-to-r from-blue-600 to-indigo-600 p-5 text-white">
                       <p className="text-sm text-blue-100">Title</p>
-                      <p className="mt-1 text-2xl font-bold">{latestRequest.title}</p>
+                      <p className="mt-1 text-2xl font-bold">
+                        {latestRequest.title}
+                      </p>
 
                       <div className="mt-5 space-y-2 text-sm text-blue-100">
-                        <p>Status: {latestRequest.status?.replaceAll("_", " ")}</p>
+                        <p>
+                          Status:{" "}
+                          {latestRequest.status?.replaceAll("_", " ")}
+                        </p>
                         <p>Priority: {latestRequest.priority}</p>
                         <p>Date: {formatDate(latestRequest.createdAt)}</p>
                         <p>Request #: {latestRequest.requestNumber}</p>
@@ -710,8 +822,14 @@ export default function TenantMaintenancePage() {
 
                   <div className="mt-6 space-y-3">
                     <QuickLink href="/tenant" label="Back to Overview" />
-                    <QuickLink href="/tenant/payments" label="Open Payments" />
-                    <QuickLink href="/tenant/documents" label="Open Documents" />
+                    <QuickLink
+                      href="/tenant/payments"
+                      label="Open Payments"
+                    />
+                    <QuickLink
+                      href="/tenant/documents"
+                      label="Open Documents"
+                    />
                   </div>
                 </div>
               </div>
@@ -722,8 +840,8 @@ export default function TenantMaintenancePage() {
 
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-2xl rounded-[28px] bg-white p-6 shadow-2xl md:p-8">
-            <div className="mb-6">
+          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl">
+            <div className="border-b border-slate-200 px-6 py-5 md:px-8">
               <h2 className="text-2xl font-bold text-slate-900">
                 Create Maintenance Request
               </h2>
@@ -732,7 +850,10 @@ export default function TenantMaintenancePage() {
               </p>
             </div>
 
-            <form onSubmit={handleCreateRequest} className="space-y-5">
+            <form
+              onSubmit={handleCreateRequest}
+              className="overflow-y-auto p-6 md:p-8 space-y-5"
+            >
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700">
                   Title
@@ -756,7 +877,10 @@ export default function TenantMaintenancePage() {
                   rows={4}
                   value={form.description}
                   onChange={(e) =>
-                    setForm((prev) => ({ ...prev, description: e.target.value }))
+                    setForm((prev) => ({
+                      ...prev,
+                      description: e.target.value,
+                    }))
                   }
                   placeholder="Describe the issue..."
                   className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
@@ -771,7 +895,10 @@ export default function TenantMaintenancePage() {
                   <select
                     value={form.category}
                     onChange={(e) =>
-                      setForm((prev) => ({ ...prev, category: e.target.value }))
+                      setForm((prev) => ({
+                        ...prev,
+                        category: e.target.value,
+                      }))
                     }
                     className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                   >
@@ -794,7 +921,10 @@ export default function TenantMaintenancePage() {
                   <select
                     value={form.priority}
                     onChange={(e) =>
-                      setForm((prev) => ({ ...prev, priority: e.target.value }))
+                      setForm((prev) => ({
+                        ...prev,
+                        priority: e.target.value,
+                      }))
                     }
                     className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                   >
@@ -815,7 +945,10 @@ export default function TenantMaintenancePage() {
                     type="date"
                     value={form.preferredDate}
                     onChange={(e) =>
-                      setForm((prev) => ({ ...prev, preferredDate: e.target.value }))
+                      setForm((prev) => ({
+                        ...prev,
+                        preferredDate: e.target.value,
+                      }))
                     }
                     className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                   />
@@ -829,7 +962,10 @@ export default function TenantMaintenancePage() {
                     type="text"
                     value={form.locationNote}
                     onChange={(e) =>
-                      setForm((prev) => ({ ...prev, locationNote: e.target.value }))
+                      setForm((prev) => ({
+                        ...prev,
+                        locationNote: e.target.value,
+                      }))
                     }
                     placeholder="Example: Master bathroom"
                     className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
@@ -949,12 +1085,18 @@ function KpiCard({
   return (
     <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
       <div className="flex items-start justify-between">
-        <div className={`h-2 w-16 rounded-full bg-gradient-to-r ${accentMap[accent]}`} />
-        <div className="rounded-2xl bg-slate-50 p-3 text-slate-500">{icon}</div>
+        <div
+          className={`h-2 w-16 rounded-full bg-gradient-to-r ${accentMap[accent]}`}
+        />
+        <div className="rounded-2xl bg-slate-50 p-3 text-slate-500">
+          {icon}
+        </div>
       </div>
 
       <p className="mt-5 text-sm font-medium text-slate-500">{title}</p>
-      <p className="mt-3 text-3xl font-bold tracking-tight text-slate-900">{value}</p>
+      <p className="mt-3 text-3xl font-bold tracking-tight text-slate-900">
+        {value}
+      </p>
       <p className="mt-3 text-sm text-slate-500">{subtitle}</p>
     </div>
   );

@@ -257,6 +257,11 @@ export default function DashboardPage() {
                 href="/units"
               />
               <SidebarItem
+                label="Vendors"
+                icon={<Wrench size={18} />}
+                href="/vendors"
+              />
+              <SidebarItem
                 label="Maintenance"
                 icon={<Wrench size={18} />}
                 href="/maintenance"
