@@ -1,4 +1,4 @@
-"use client";
+client";
 
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
@@ -29,7 +29,8 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-const API_BASE = "http://localhost:4000/api";
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL || "https://propertyos-backend.onrender.com/api";
 
 type StoredUser = {
   id?: string;
@@ -156,6 +157,7 @@ export default function InsightsPage() {
         cache: "no-store",
         headers: {
           Authorization: `Bearer ${token || ""}`,
+          "Content-Type": "application/json",
         },
       });
 
@@ -172,6 +174,7 @@ export default function InsightsPage() {
 
       setData(result);
     } catch (error: any) {
+      console.error("Insights fetch error:", error);
       showNotification(
         "error",
         "Unable to load insights",
