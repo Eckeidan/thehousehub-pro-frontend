@@ -1,4 +1,4 @@
-client";
+"user client";
 
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
