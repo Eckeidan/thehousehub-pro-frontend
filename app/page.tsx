@@ -19,7 +19,8 @@ type LoginResponse = {
 };
 
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -36,7 +37,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const res = await fetch(`${API_BASE}/api/auth/login`, {
+      const res = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
