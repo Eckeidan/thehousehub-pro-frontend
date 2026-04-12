@@ -118,7 +118,7 @@ export default function DashboardPage() {
       try {
         const token = localStorage.getItem("token");
 
-        const res = await fetch(`${API_BASE}/api/dashboard`, {
+        const res = await fetch(`${API_BASE}/dashboard`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
