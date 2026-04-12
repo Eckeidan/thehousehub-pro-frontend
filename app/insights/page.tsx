@@ -29,7 +29,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://propertyos-backend.onrender.com/api";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://propertyos-backend.onrender.com";
 
 type StoredUser = {
   id?: string;
@@ -147,42 +147,50 @@ export default function InsightsPage() {
   }, [notification.open]);
 
   async function fetchInsights() {
-    try {
-      setLoading(true);
+  try {
+    setLoading(true);
 
-      const token = localStorage.getItem("token");
+    const token = localStorage.getItem("token");
 
-      const res = await fetch(`${API_BASE}/insights`, {
-        cache: "no-store",
-        headers: {
-          Authorization: `Bearer ${token || ""}`,
-          "Content-Type": "application/json",
-        },
-      });
+    const res = await fetch(`${API_BASE}/api/insights`, {
+      cache: "no-store",
+      headers: {
+        Authorization: `Bearer ${token || ""}`,
+        "Content-Type": "application/json",
+      },
+    });
 
-      if (res.status === 401) {
-        handleUnauthorized();
-        return;
-      }
-
-      const result = await res.json().catch(() => null);
-
-      if (!res.ok) {
-        throw new Error(result?.error || "Failed to load insights");
-      }
-
-      setData(result);
-    } catch (error: any) {
-      console.error("Insights fetch error:", error);
-      showNotification(
-        "error",
-        "Unable to load insights",
-        error?.message || "Failed to load insights"
-      );
-    } finally {
-      setLoading(false);
+    if (res.status === 401) {
+      handleUnauthorized();
+      return;
     }
+
+    const contentType = res.headers.get("content-type") || "";
+    let result: any = null;
+
+    if (contentType.includes("application/json")) {
+      result = await res.json();
+    } else {
+      const rawText = await res.text();
+      throw new Error(rawText || "Invalid response from insights API");
+    }
+
+    if (!res.ok) {
+      throw new Error(result?.error || result?.message || "Failed to load insights");
+    }
+
+    setData(result);
+  } catch (error: any) {
+    console.error("Insights fetch error:", error);
+    showNotification(
+      "error",
+      "Unable to load insights",
+      error?.message || "Failed to load insights"
+    );
+  } finally {
+    setLoading(false);
   }
+}
 
   useEffect(() => {
     if (checkingAuth) return;
