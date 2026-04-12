@@ -81,7 +81,7 @@ export default function DashboardPage() {
   const [user, setUser] = useState<StoredUser | null>(null);
 
   const API_BASE =
-    process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+    process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -118,7 +118,7 @@ export default function DashboardPage() {
       try {
         const token = localStorage.getItem("token");
 
-        const res = await fetch(`${API_BASE}/dashboard`, {
+        const res = await fetch(`${API_BASE}/api/dashboard`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
