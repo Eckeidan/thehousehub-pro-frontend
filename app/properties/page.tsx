@@ -252,7 +252,7 @@ export default function PropertiesPage() {
 
       const token = localStorage.getItem("token");
 
-      const res = await fetch(`${API_URL}/api/properties`, {
+      const res = await fetch(`${API_URL}/properties`, {
         cache: "no-store",
         headers: {
           Authorization: `Bearer ${token || ""}`,
@@ -418,8 +418,8 @@ export default function PropertiesPage() {
       };
 
       const url = isEditing
-        ? `${API_URL}/api/properties/${editingPropertyId}`
-        : `${API_URL}/api/properties`;
+        ? `${API_URL}/properties/${editingPropertyId}`
+        : `${API_URL}/properties`;
 
       const method = isEditing ? "PUT" : "POST";
 
@@ -468,7 +468,7 @@ export default function PropertiesPage() {
     try {
       const token = localStorage.getItem("token");
 
-      const res = await fetch(`${API_URL}/api/properties/${deleteId}`, {
+      const res = await fetch(`${API_URL}/properties/${deleteId}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token || ""}`,
