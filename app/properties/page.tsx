@@ -95,7 +95,7 @@ type StoredUser = {
 };
 
 const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 const PROPERTY_TYPES = [
   { label: "Apartment", value: "APARTMENT" },
@@ -418,8 +418,8 @@ export default function PropertiesPage() {
       };
 
       const url = isEditing
-        ? `${API_URL}/properties/${editingPropertyId}`
-        : `${API_URL}/properties`;
+        ? `${API_URL}/api/properties/${editingPropertyId}`
+        : `${API_URL}/api/properties`;
 
       const method = isEditing ? "PUT" : "POST";
 
@@ -468,7 +468,7 @@ export default function PropertiesPage() {
     try {
       const token = localStorage.getItem("token");
 
-      const res = await fetch(`${API_URL}/properties/${deleteId}`, {
+      const res = await fetch(`${API_URL}/api/properties/${deleteId}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token || ""}`,
