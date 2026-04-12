@@ -68,7 +68,7 @@ type StoredUser = {
 };
 
 const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
 
 function InfoCard({
   label,
@@ -192,7 +192,7 @@ export default function PropertyDetailsPage() {
 
         const token = localStorage.getItem("token");
 
-        const res = await fetch(`${API_URL}/api/properties/${id}`, {
+        const res = await fetch(`${API_URL}/properties/${id}`, {
           cache: "no-store",
           headers: {
             Authorization: `Bearer ${token || ""}`,
