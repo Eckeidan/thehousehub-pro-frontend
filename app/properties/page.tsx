@@ -252,7 +252,7 @@ export default function PropertiesPage() {
 
       const token = localStorage.getItem("token");
 
-      const res = await fetch(`${API_URL}/properties`, {
+      const res = await fetch(`${API_URL}/api/properties`, {
         cache: "no-store",
         headers: {
           Authorization: `Bearer ${token || ""}`,
