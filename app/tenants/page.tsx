@@ -60,7 +60,8 @@ interface Tenant {
   createdAt?: string;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 function formatDate(date?: string | null) {
   if (!date) return null;
