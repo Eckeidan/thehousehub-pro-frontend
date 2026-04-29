@@ -379,53 +379,59 @@ export default function TenantsPage() {
             </p>
 
             <div className="space-y-2">
-              <SidebarItem
-                label="Dashboard"
-                icon={<LayoutDashboard size={18} />}
-                href="/dashboard"
-              />
-              <SidebarItem
-                label="Properties"
-                icon={<Building2 size={18} />}
-                href="/properties"
-              />
-              <SidebarItem
-                label="Tenants"
-                icon={<Users size={18} />}
-                active
-                href="/tenants"
-              />
-              <SidebarItem
-                label="Units"
-                icon={<Home size={18} />}
-                href="/units"
-              />
-              <SidebarItem
-                label="Maintenance"
-                icon={<Wrench size={18} />}
-                href="/maintenance"
-              />
-              <SidebarItem
-                label="Financials"
-                icon={<Wallet size={18} />}
-                href="/payments"
-              />
-              <SidebarItem
-                label="Documents"
-                icon={<FileText size={18} />}
-                href="/documents"
-              />
-              <SidebarItem
-                label="AI Insights"
-                icon={<Brain size={18} />}
-                href="/insights"
-              />
-              <SidebarItem
-                label="Settings"
-                icon={<Settings size={18} />}
-                href="/settings"
-              />
-            </div>
+                          <SidebarItem
+                            label="Dashboard"
+                            icon={<LayoutDashboard size={18} />}
+                            
+                            href="/dashboard"
+                          />
+                          <SidebarItem
+                            label="Properties"
+                            icon={<Building2 size={18} />}
+                            href="/properties"
+                          />
+                          <SidebarItem
+                            label="Tenants"
+                            icon={<Users size={18} />}
+                            active
+                            href="/tenants"
+                          />
+                          <SidebarItem
+                            label="Units"
+                            icon={<Home size={18} />}
+                            href="/units"
+                          />
+                          <SidebarItem
+                            label="Vendors"
+                            icon={<Wrench size={18} />}
+                            href="/vendors"
+                          />
+                          <SidebarItem
+                            label="Maintenance"
+                            icon={<Wrench size={18} />}
+                            href="/maintenance"
+                          />
+                          <SidebarItem
+                            label="Financials"
+                            icon={<Wallet size={18} />}
+                            href="/payments"
+                          />
+                          <SidebarItem
+                            label="Documents"
+                            icon={<FileText size={18} />}
+                            href="/documents"
+                          />
+                          <SidebarItem
+                            label="AI Insights"
+                            icon={<Brain size={18} />}
+                            href="/insights"
+                          />
+                          <SidebarItem
+                            label="Settings"
+                            icon={<Settings size={18} />}
+                            href="/settings"
+                          />
+                        </div>
           </nav>
 
           <div className="border-t border-white/10 px-6 py-5">

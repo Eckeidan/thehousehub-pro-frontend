@@ -20,6 +20,7 @@ import {
   PauseCircle,
   XCircle,
   Clock3,
+  ImageIcon,
   Phone,
   MapPin,
   UserCircle2,
@@ -131,6 +132,12 @@ type MaintenanceRequest = {
     serviceCategory?: string | null;
   } | null;
   aiRecommendations?: AIRecommendation[];
+  photos?: {
+    url: string;
+    fileName?: string;
+    mimeType?: string;
+    size?: number;
+  }[] | null;
 };
 
 function formatDate(value?: string | null) {
@@ -162,6 +169,12 @@ function formatMoney(value?: string | number | null) {
     currency: "USD",
     maximumFractionDigits: 0,
   }).format(amount);
+}
+
+function getPhotoUrl(photoUrl?: string | null) {
+  if (!photoUrl) return "";
+  if (photoUrl.startsWith("http")) return photoUrl;
+  return `${API_BASE}${photoUrl}`;
 }
 
 function toNumber(value?: string | number | null) {
@@ -256,6 +269,12 @@ export default function MaintenanceDetailsPage() {
     actualCost: "",
     adminNotes: "",
   });
+
+  const [selectedPhoto, setSelectedPhoto] = useState<{
+  url: string;
+  fileName?: string;
+} | null>(null);
+
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -777,6 +796,48 @@ export default function MaintenanceDetailsPage() {
                   {request.description || "No description provided."}
                 </p>
               </Panel>
+
+              <Panel
+  title="Attached Photos"
+  icon={<ImageIcon className="h-5 w-5 text-slate-500" />}
+>
+  {Array.isArray(request.photos) && request.photos.length > 0 ? (
+    <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+      {request.photos.map((photo, index) => (
+        <button
+          type="button"
+          key={`${photo.url}-${index}`}
+          onClick={() =>
+            setSelectedPhoto({
+              url: getPhotoUrl(photo.url),
+              fileName: photo.fileName || `Photo ${index + 1}`,
+            })
+          }
+          className="group overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-sm"
+        >
+          <img
+            src={getPhotoUrl(photo.url)}
+            alt={photo.fileName || "Maintenance photo"}
+            className="h-40 w-full object-cover transition group-hover:scale-105"
+          />
+
+          <div className="p-3">
+            <p className="truncate text-xs font-semibold text-slate-700">
+              {photo.fileName || `Photo ${index + 1}`}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Click to open
+            </p>
+          </div>
+        </button>
+      ))}
+    </div>
+  ) : (
+    <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-5 text-sm text-slate-500">
+      No photos attached to this maintenance request.
+    </div>
+  )}
+</Panel>
 
               <Panel
                 title="Request Details"
@@ -1319,6 +1380,41 @@ export default function MaintenanceDetailsPage() {
           </div>
         </div>
       </div>
+
+
+
+      {selectedPhoto && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+    <div className="relative w-full max-w-5xl overflow-hidden rounded-3xl bg-white shadow-2xl">
+      <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+        <div>
+          <p className="text-sm font-semibold text-slate-900">
+            Maintenance Photo
+          </p>
+          <p className="text-xs text-slate-500">
+            {selectedPhoto.fileName}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setSelectedPhoto(null)}
+          className="rounded-full bg-slate-100 p-2 text-slate-600 hover:bg-slate-200"
+        >
+          <XCircle className="h-5 w-5" />
+        </button>
+      </div>
+
+      <div className="max-h-[78vh] bg-slate-950 p-4">
+        <img
+          src={selectedPhoto.url}
+          alt={selectedPhoto.fileName || "Maintenance photo"}
+          className="mx-auto max-h-[72vh] w-auto rounded-2xl object-contain"
+        />
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 }

@@ -29,7 +29,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-const API_BASE = "http://localhost:4000/api";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 type StoredUser = {
   id?: string;
@@ -171,7 +171,7 @@ export default function SettingsPage() {
       setLoading(true);
       const token = localStorage.getItem("token");
 
-      const res = await fetch(`${API_BASE}/settings`, {
+      const res = await fetch(`${API_BASE}/api/settings`, {
         cache: "no-store",
         headers: {
           Authorization: `Bearer ${token || ""}`,
@@ -215,7 +215,7 @@ export default function SettingsPage() {
       setUsersLoading(true);
       const token = localStorage.getItem("token");
 
-      const res = await fetch(`${API_BASE}/users`, {
+      const res = await fetch(`${API_BASE}/api/users`, {
         cache: "no-store",
         headers: {
           Authorization: `Bearer ${token || ""}`,
@@ -269,7 +269,7 @@ export default function SettingsPage() {
       setSaving(true);
       const token = localStorage.getItem("token");
 
-      const res = await fetch(`${API_BASE}/settings`, {
+      const res = await fetch(`${API_BASE}/api/settings`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -352,7 +352,7 @@ export default function SettingsPage() {
       setCreatingUser(true);
       const token = localStorage.getItem("token");
 
-      const res = await fetch(`${API_BASE}/users`, {
+      const res = await fetch(`${API_BASE}/api/users`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -522,6 +522,11 @@ export default function SettingsPage() {
               label="Units"
               icon={<Home size={18} />}
               href="/units"
+            />
+            <SidebarItem
+              label="Vendors"
+              icon={<Wrench size={18} />}
+              href="/vendors"
             />
             <SidebarItem
               label="Maintenance"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -17,11 +17,11 @@ import {
   MessageCircle,
   Search,
   Inbox,
-  Mail,
-  Clock,
-  User,
-  Building,
+  Send,
   Loader2,
+  Mail,
+  Building,
+  User,
 } from "lucide-react";
 
 const API_BASE =
@@ -34,29 +34,54 @@ type StoredUser = {
   role?: string;
 };
 
-type Communication = {
+type InboxMessage = {
   id: string;
-  type: string;
-  direction: string;
+  tenantId: string | null;
   subject?: string | null;
   messageSummary: string;
-  relatedTo?: string | null;
+  direction: string;
   sentAt: string;
   senderName?: string | null;
-  receiverName?: string | null;
   tenant?: {
     id: string;
     fullName?: string | null;
     email?: string | null;
-    phone?: string | null;
   } | null;
   property?: {
     id: string;
     name?: string | null;
     addressLine1?: string | null;
+  } | null;
+};
+
+type ThreadMessage = {
+  id: string;
+  subject?: string | null;
+  messageSummary: string;
+  direction: "INBOUND" | "OUTBOUND" | string;
+  senderName?: string | null;
+  receiverName?: string | null;
+  sentAt: string;
+};
+
+type ThreadData = {
+  tenant?: {
+    id: string;
+    fullName?: string;
+    email?: string;
+    phone?: string;
+  };
+  property?: {
+    name?: string | null;
+    addressLine1?: string | null;
     city?: string | null;
     state?: string | null;
   } | null;
+  unit?: {
+    unitCode?: string | null;
+    unitName?: string | null;
+  } | null;
+  messages: ThreadMessage[];
 };
 
 export default function AdminCommunicationsPage() {
@@ -64,10 +89,19 @@ export default function AdminCommunicationsPage() {
 
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [user, setUser] = useState<StoredUser | null>(null);
-  const [communications, setCommunications] = useState<Communication[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+
+  const [inbox, setInbox] = useState<InboxMessage[]>([]);
+  const [thread, setThread] = useState<ThreadData | null>(null);
+  const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
+
+  const [loadingInbox, setLoadingInbox] = useState(true);
+  const [loadingThread, setLoadingThread] = useState(false);
+  const [sending, setSending] = useState(false);
+
   const [query, setQuery] = useState("");
+  const [reply, setReply] = useState("");
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -98,13 +132,13 @@ export default function AdminCommunicationsPage() {
 
   useEffect(() => {
     if (!checkingAuth) {
-      fetchCommunications();
+      fetchInbox();
     }
   }, [checkingAuth]);
 
-  async function fetchCommunications() {
+  async function fetchInbox() {
     try {
-      setLoading(true);
+      setLoadingInbox(true);
       setError("");
 
       const token = localStorage.getItem("token");
@@ -126,14 +160,110 @@ export default function AdminCommunicationsPage() {
       }
 
       if (!res.ok) {
-        throw new Error(data?.error || "Failed to load messages");
+        throw new Error(data?.error || "Failed to load inbox");
       }
 
-      setCommunications(Array.isArray(data?.communications) ? data.communications : []);
+      const rows = Array.isArray(data?.communications)
+        ? data.communications
+        : [];
+
+      setInbox(rows);
+
+      const firstTenantId = rows.find((m: InboxMessage) => m.tenantId)?.tenantId;
+      if (!selectedTenantId && firstTenantId) {
+        openThread(firstTenantId);
+      }
     } catch (err: any) {
-      setError(err?.message || "Failed to load messages.");
+      setError(err?.message || "Failed to load inbox.");
     } finally {
-      setLoading(false);
+      setLoadingInbox(false);
+    }
+  }
+
+  async function openThread(tenantId: string) {
+    try {
+      setSelectedTenantId(tenantId);
+      setLoadingThread(true);
+      setError("");
+      setSuccess("");
+
+      const token = localStorage.getItem("token");
+
+      const res = await fetch(`${API_BASE}/api/communications/thread/${tenantId}`, {
+        cache: "no-store",
+        headers: {
+          Authorization: `Bearer ${token || ""}`,
+        },
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(data?.error || "Failed to load conversation");
+      }
+
+      setThread({
+        tenant: data.tenant,
+        property: data.property,
+        unit: data.unit,
+        messages: Array.isArray(data.messages) ? data.messages : [],
+      });
+    } catch (err: any) {
+      setError(err?.message || "Failed to load conversation.");
+    } finally {
+      setLoadingThread(false);
+    }
+  }
+
+  async function sendReply(e: FormEvent) {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+
+    if (!selectedTenantId) {
+      setError("Please select a tenant conversation first.");
+      return;
+    }
+
+    if (!reply.trim()) {
+      setError("Please write a reply.");
+      return;
+    }
+
+    try {
+      setSending(true);
+
+      const token = localStorage.getItem("token");
+
+      const res = await fetch(
+        `${API_BASE}/api/communications/thread/${selectedTenantId}/reply`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token || ""}`,
+          },
+          body: JSON.stringify({
+            message: reply.trim(),
+            subject: thread?.messages?.[0]?.subject || "Management reply",
+          }),
+        }
+      );
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(data?.error || "Failed to send reply");
+      }
+
+      setReply("");
+      setSuccess("Reply sent successfully.");
+      await openThread(selectedTenantId);
+      await fetchInbox();
+    } catch (err: any) {
+      setError(err?.message || "Failed to send reply.");
+    } finally {
+      setSending(false);
     }
   }
 
@@ -143,26 +273,36 @@ export default function AdminCommunicationsPage() {
     router.replace("/");
   }
 
-  const filtered = useMemo(() => {
+  const conversations = useMemo(() => {
+    const grouped = new Map<string, InboxMessage>();
+
+    for (const item of inbox) {
+      if (!item.tenantId) continue;
+      if (!grouped.has(item.tenantId)) {
+        grouped.set(item.tenantId, item);
+      }
+    }
+
+    return Array.from(grouped.values());
+  }, [inbox]);
+
+  const filteredConversations = useMemo(() => {
     const value = query.toLowerCase().trim();
+    if (!value) return conversations;
 
-    if (!value) return communications;
-
-    return communications.filter((item) => {
-      return [
-        item.subject,
-        item.messageSummary,
-        item.senderName,
-        item.receiverName,
+    return conversations.filter((item) =>
+      [
         item.tenant?.fullName,
         item.tenant?.email,
+        item.subject,
+        item.messageSummary,
         item.property?.name,
         item.property?.addressLine1,
       ]
         .filter(Boolean)
-        .some((text) => String(text).toLowerCase().includes(value));
-    });
-  }, [communications, query]);
+        .some((text) => String(text).toLowerCase().includes(value))
+    );
+  }, [conversations, query]);
 
   const initials =
     (user?.fullName || user?.name || "User")
@@ -171,8 +311,6 @@ export default function AdminCommunicationsPage() {
       .join("")
       .slice(0, 2)
       .toUpperCase() || "US";
-
-  const displayName = user?.fullName || user?.name || "User";
 
   if (checkingAuth) {
     return (
@@ -221,7 +359,7 @@ export default function AdminCommunicationsPage() {
               </div>
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-white">
-                  {displayName}
+                  {user?.fullName || user?.name || "User"}
                 </p>
                 <p className="truncate text-xs text-blue-100/70">
                   {user?.email || "Admin"}
@@ -244,19 +382,19 @@ export default function AdminCommunicationsPage() {
             <div className="flex flex-col gap-5 px-6 py-6 md:flex-row md:items-center md:justify-between md:px-8">
               <div>
                 <span className="inline-flex rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-blue-700">
-                  Communication Center
+                  Smart Messages
                 </span>
-                <h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-900">
-                  Tenant Messages
+                <h2 className="mt-3 text-3xl font-bold tracking-tight">
+                  Tenant Conversations
                 </h2>
                 <p className="mt-1 text-slate-500">
-                  Review messages sent by tenants from the tenant portal.
+                  Inbox, conversation thread, and admin replies.
                 </p>
               </div>
 
               <button
-                onClick={fetchCommunications}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                onClick={fetchInbox}
+                className="rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
               >
                 Refresh
               </button>
@@ -264,129 +402,208 @@ export default function AdminCommunicationsPage() {
           </header>
 
           <section className="p-6 md:p-8">
-            <div className="mb-6 grid gap-4 md:grid-cols-3">
-              <StatCard
-                icon={<Inbox size={20} />}
-                label="Total Messages"
-                value={communications.length}
-              />
-              <StatCard
-                icon={<Mail size={20} />}
-                label="Inbound"
-                value={communications.filter((m) => m.direction === "INBOUND").length}
-              />
-              <StatCard
-                icon={<MessageCircle size={20} />}
-                label="Tenant Contacts"
-                value={communications.filter((m) => m.relatedTo === "TENANT_CONTACT").length}
-              />
-            </div>
-
-            <div className="mb-6 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-              <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                <Search className="h-5 w-5 text-slate-400" />
-                <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search by tenant, subject, property, or message..."
-                  className="w-full bg-transparent text-sm outline-none"
-                />
-              </div>
-            </div>
-
             {error && (
-              <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              <div className="mb-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
                 {error}
               </div>
             )}
 
-            {loading ? (
-              <div className="flex items-center justify-center rounded-3xl bg-white p-12 shadow-sm ring-1 ring-slate-200">
-                <div className="flex items-center gap-3 text-slate-500">
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                  Loading messages...
-                </div>
-              </div>
-            ) : filtered.length === 0 ? (
-              <div className="rounded-3xl bg-white p-12 text-center shadow-sm ring-1 ring-slate-200">
-                <Inbox className="mx-auto h-12 w-12 text-slate-300" />
-                <h3 className="mt-4 text-lg font-bold text-slate-900">
-                  No messages found
-                </h3>
-                <p className="mt-2 text-sm text-slate-500">
-                  Tenant messages will appear here once submitted.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {filtered.map((item) => (
-                  <article
-                    key={item.id}
-                    className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200"
-                  >
-                    <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold uppercase tracking-widest text-blue-700">
-                            {item.direction}
-                          </span>
-                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold uppercase tracking-widest text-slate-600">
-                            {item.type}
-                          </span>
-                        </div>
-
-                        <h3 className="mt-3 text-xl font-bold text-slate-900">
-                          {item.subject || "No subject"}
-                        </h3>
-
-                        <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-600">
-                          {item.messageSummary}
-                        </p>
-                      </div>
-
-                      <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-500">
-                        <div className="flex items-center gap-2">
-                          <Clock size={16} />
-                          {new Date(item.sentAt).toLocaleString()}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-5 grid gap-3 border-t border-slate-100 pt-5 md:grid-cols-2">
-                      <InfoLine
-                        icon={<User size={16} />}
-                        label="Tenant"
-                        value={
-                          item.tenant?.fullName ||
-                          item.senderName ||
-                          item.tenant?.email ||
-                          "Unknown tenant"
-                        }
-                      />
-                      <InfoLine
-                        icon={<Mail size={16} />}
-                        label="Email"
-                        value={item.tenant?.email || "Not available"}
-                      />
-                      <InfoLine
-                        icon={<Building size={16} />}
-                        label="Property"
-                        value={
-                          item.property?.name ||
-                          item.property?.addressLine1 ||
-                          "Not linked"
-                        }
-                      />
-                      <InfoLine
-                        icon={<MessageCircle size={16} />}
-                        label="Related To"
-                        value={item.relatedTo || "General message"}
-                      />
-                    </div>
-                  </article>
-                ))}
+            {success && (
+              <div className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                {success}
               </div>
             )}
+
+            <div className="grid min-h-[680px] overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-200 lg:grid-cols-[380px_1fr]">
+              <aside className="border-r border-slate-200 bg-slate-50">
+                <div className="border-b border-slate-200 p-4">
+                  <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                    <Search className="h-5 w-5 text-slate-400" />
+                    <input
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      placeholder="Search conversations..."
+                      className="w-full bg-transparent text-sm outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="max-h-[610px] overflow-y-auto">
+                  {loadingInbox ? (
+                    <div className="flex items-center gap-2 p-6 text-sm text-slate-500">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading inbox...
+                    </div>
+                  ) : filteredConversations.length === 0 ? (
+                    <div className="p-8 text-center text-sm text-slate-500">
+                      <Inbox className="mx-auto mb-3 h-10 w-10 text-slate-300" />
+                      No conversations found.
+                    </div>
+                  ) : (
+                    filteredConversations.map((item) => {
+                      const active = item.tenantId === selectedTenantId;
+
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => item.tenantId && openThread(item.tenantId)}
+                          className={`w-full border-b border-slate-200 px-4 py-4 text-left transition ${
+                            active ? "bg-blue-50" : "bg-white hover:bg-slate-50"
+                          }`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-700 text-sm font-bold text-white">
+                              {(item.tenant?.fullName || item.senderName || "T")
+                                .slice(0, 2)
+                                .toUpperCase()}
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                              <div className="flex justify-between gap-2">
+                                <p className="truncate font-bold text-slate-900">
+                                  {item.tenant?.fullName ||
+                                    item.senderName ||
+                                    "Unknown tenant"}
+                                </p>
+                                <span className="shrink-0 text-[11px] text-slate-400">
+                                  {new Date(item.sentAt).toLocaleDateString()}
+                                </span>
+                              </div>
+
+                              <p className="truncate text-xs text-slate-500">
+                                {item.property?.name ||
+                                  item.property?.addressLine1 ||
+                                  "Not linked"}
+                              </p>
+
+                              <p className="mt-1 truncate text-sm text-slate-600">
+                                {item.direction === "OUTBOUND" ? "You: " : ""}
+                                {item.messageSummary}
+                              </p>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </aside>
+
+              <div className="flex min-h-[680px] flex-col bg-white">
+                {!selectedTenantId ? (
+                  <div className="flex flex-1 items-center justify-center p-10 text-center">
+                    <div>
+                      <MessageCircle className="mx-auto h-14 w-14 text-slate-300" />
+                      <h3 className="mt-4 text-xl font-bold">Select a conversation</h3>
+                      <p className="mt-2 text-sm text-slate-500">
+                        Choose a tenant from the inbox to view the message thread.
+                      </p>
+                    </div>
+                  </div>
+                ) : loadingThread ? (
+                  <div className="flex flex-1 items-center justify-center gap-2 text-slate-500">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Loading conversation...
+                  </div>
+                ) : thread ? (
+                  <>
+                    <div className="border-b border-slate-200 px-6 py-4">
+                      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                        <div>
+                          <h3 className="text-xl font-bold">
+                            {thread.tenant?.fullName || "Tenant"}
+                          </h3>
+                          <p className="text-sm text-slate-500">
+                            {thread.tenant?.email || "No email"}
+                          </p>
+                        </div>
+
+                        <div className="grid gap-2 text-xs text-slate-500 md:text-right">
+                          <span>
+                            <Building className="mr-1 inline h-3.5 w-3.5" />
+                            {thread.property?.name ||
+                              thread.property?.addressLine1 ||
+                              "Property not linked"}
+                          </span>
+                          <span>
+                            <Home className="mr-1 inline h-3.5 w-3.5" />
+                            {thread.unit?.unitName ||
+                              thread.unit?.unitCode ||
+                              "Unit not linked"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex-1 space-y-4 overflow-y-auto bg-slate-50 p-6">
+                      {thread.messages.length === 0 ? (
+                        <div className="text-center text-sm text-slate-500">
+                          No messages in this thread yet.
+                        </div>
+                      ) : (
+                        thread.messages.map((msg) => {
+                          const isAdmin = msg.direction === "OUTBOUND";
+
+                          return (
+                            <div
+                              key={msg.id}
+                              className={`flex ${isAdmin ? "justify-end" : "justify-start"}`}
+                            >
+                              <div
+                                className={`max-w-[75%] rounded-3xl px-5 py-3 shadow-sm ${
+                                  isAdmin
+                                    ? "bg-blue-700 text-white"
+                                    : "bg-white text-slate-800 ring-1 ring-slate-200"
+                                }`}
+                              >
+                                <p className="whitespace-pre-wrap text-sm leading-6">
+                                  {msg.messageSummary}
+                                </p>
+                                <p
+                                  className={`mt-2 text-[11px] ${
+                                    isAdmin ? "text-blue-100" : "text-slate-400"
+                                  }`}
+                                >
+                                  {msg.senderName || (isAdmin ? "Management" : "Tenant")} ·{" "}
+                                  {new Date(msg.sentAt).toLocaleString()}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    <form
+                      onSubmit={sendReply}
+                      className="border-t border-slate-200 bg-white p-4"
+                    >
+                      <div className="flex gap-3">
+                        <textarea
+                          value={reply}
+                          onChange={(e) => setReply(e.target.value)}
+                          rows={2}
+                          placeholder="Write a reply to the tenant..."
+                          className="min-h-[52px] flex-1 resize-none rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                        />
+                        <button
+                          type="submit"
+                          disabled={sending}
+                          className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-700 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-blue-200 hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {sending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Send className="h-4 w-4" />
+                          )}
+                          Send
+                        </button>
+                      </div>
+                    </form>
+                  </>
+                ) : null}
+              </div>
+            </div>
           </section>
         </main>
       </div>
@@ -418,47 +635,5 @@ function SidebarItem({
         <span>{label}</span>
       </div>
     </Link>
-  );
-}
-
-function StatCard({
-  icon,
-  label,
-  value,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: number;
-}) {
-  return (
-    <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-      <div className="flex items-center justify-between">
-        <div className="rounded-2xl bg-blue-50 p-3 text-blue-700">{icon}</div>
-        <p className="text-3xl font-bold text-slate-900">{value}</p>
-      </div>
-      <p className="mt-4 text-sm font-medium text-slate-500">{label}</p>
-    </div>
-  );
-}
-
-function InfoLine({
-  icon,
-  label,
-  value,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="flex items-start gap-3 rounded-2xl bg-slate-50 px-4 py-3">
-      <div className="mt-0.5 text-blue-700">{icon}</div>
-      <div>
-        <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
-          {label}
-        </p>
-        <p className="mt-1 text-sm font-semibold text-slate-700">{value}</p>
-      </div>
-    </div>
   );
 }

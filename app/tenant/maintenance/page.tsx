@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -26,10 +26,14 @@ import {
   Pencil,
   BadgeDollarSign,
   UserCircle2,
-  Building2,
+  Camera,
+  X,
+  ImageIcon,
+  MessageCircle,
+  Settings,
 } from "lucide-react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 type AuthUser = {
   id: string;
@@ -58,6 +62,13 @@ type AuthUser = {
   } | null;
 };
 
+type MaintenancePhoto = {
+  url: string;
+  fileName?: string;
+  mimeType?: string;
+  size?: number;
+};
+
 type MaintenanceRequest = {
   id: string;
   requestNumber: string;
@@ -71,6 +82,7 @@ type MaintenanceRequest = {
   entryPermission?: boolean;
   estimatedCost?: number | string | null;
   actualCost?: number | string | null;
+  photos?: MaintenancePhoto[] | null;
   createdAt: string;
   updatedAt: string;
   property?: {
@@ -100,6 +112,7 @@ type MaintenanceRequest = {
 
 function formatDate(value?: string | null) {
   if (!value) return "Not set";
+
   return new Date(value).toLocaleDateString("en-US", {
     year: "numeric",
     month: "short",
@@ -109,8 +122,11 @@ function formatDate(value?: string | null) {
 
 function formatMoney(value?: number | string | null) {
   if (value === null || value === undefined || value === "") return "Pending";
+
   const amount = Number(value);
+
   if (Number.isNaN(amount)) return String(value);
+
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
@@ -118,14 +134,29 @@ function formatMoney(value?: number | string | null) {
   }).format(amount);
 }
 
+function formatFileSize(size: number) {
+  if (size < 1024 * 1024) {
+    return `${Math.round(size / 1024)} KB`;
+  }
+
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function getInitials(name?: string | null) {
   if (!name) return "TN";
+
   return name
     .split(" ")
     .map((part) => part[0])
     .join("")
     .slice(0, 2)
     .toUpperCase();
+}
+
+function getPhotoUrl(photoUrl?: string | null) {
+  if (!photoUrl) return "";
+  if (photoUrl.startsWith("http")) return photoUrl;
+  return `${API_BASE}${photoUrl}`;
 }
 
 function getPriorityBadge(priority?: string | null) {
@@ -171,7 +202,6 @@ function getStatusIcon(status?: string | null) {
     case "ON_HOLD":
       return <PauseCircle className="h-5 w-5" />;
     case "RESOLVED":
-      return <CheckCircle2 className="h-5 w-5" />;
     case "CLOSED":
       return <CheckCircle2 className="h-5 w-5" />;
     case "CANCELLED":
@@ -194,6 +224,10 @@ export default function TenantMaintenancePage() {
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [formError, setFormError] = useState("");
+  const [selectedPhotos, setSelectedPhotos] = useState<File[]>([]);
+
+  const [uploadWarning, setUploadWarning] = useState("");
+
 
   const [form, setForm] = useState({
     title: "",
@@ -223,6 +257,7 @@ export default function TenantMaintenancePage() {
           router.replace("/dashboard");
           return;
         }
+
         if (role === "owner") {
           router.replace("/owner");
           return;
@@ -251,7 +286,7 @@ export default function TenantMaintenancePage() {
 
       const token = localStorage.getItem("token");
 
-      const meRes = await fetch(`${API_URL}/api/auth/me`, {
+      const meRes = await fetch(`${API_BASE}/api/auth/me`, {
         headers: {
           Authorization: `Bearer ${token || ""}`,
         },
@@ -274,7 +309,7 @@ export default function TenantMaintenancePage() {
       const currentUser: AuthUser = meData?.user || null;
       setUser(currentUser);
 
-      const maintenanceRes = await fetch(`${API_URL}/api/maintenance`, {
+      const maintenanceRes = await fetch(`${API_BASE}/api/tenant/maintenance`, {
         cache: "no-store",
         headers: {
           Authorization: `Bearer ${token || ""}`,
@@ -282,12 +317,22 @@ export default function TenantMaintenancePage() {
       });
 
       const maintenanceData = await maintenanceRes.json().catch(() => []);
-      const tenantId = currentUser?.tenant?.id || currentUser?.tenantId;
+
+      if (maintenanceRes.status === 401) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        router.replace("/");
+        return;
+      }
+
+      if (!maintenanceRes.ok) {
+        throw new Error(
+          maintenanceData?.error || "Failed to load maintenance requests"
+        );
+      }
 
       const tenantRequests = Array.isArray(maintenanceData)
-        ? maintenanceData.filter(
-            (item: MaintenanceRequest) => item?.tenant?.id === tenantId
-          )
+        ? maintenanceData
         : [];
 
       tenantRequests.sort(
@@ -310,18 +355,80 @@ export default function TenantMaintenancePage() {
     router.replace("/");
   }
 
-  async function handleCreateRequest(e: React.FormEvent<HTMLFormElement>) {
+  function resetCreateForm() {
+    setForm({
+      title: "",
+      description: "",
+      category: "GENERAL",
+      priority: "MEDIUM",
+      preferredDate: "",
+      entryPermission: false,
+      locationNote: "",
+    });
+    setSelectedPhotos([]);
+    setFormError("");
+  }
+
+  function handlePhotoChange(files: FileList | null) {
+  const incomingFiles = Array.from(files || []);
+  const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+  const maxSize = 5 * 1024 * 1024;
+
+  if (incomingFiles.length === 0) return;
+
+  const accepted: File[] = [];
+  const rejected: string[] = [];
+
+  incomingFiles.forEach((file) => {
+    if (!allowedTypes.includes(file.type)) {
+      rejected.push(`${file.name} is not a supported image format.`);
+      return;
+    }
+
+    if (file.size > maxSize) {
+      rejected.push(
+        `${file.name} is ${formatFileSize(file.size)}. Max allowed is 5MB.`
+      );
+      return;
+    }
+
+    accepted.push(file);
+  });
+
+  setSelectedPhotos((prev) => {
+    const merged = [...prev, ...accepted];
+
+    const unique = merged.filter(
+      (file, index, array) =>
+        index ===
+        array.findIndex(
+          (item) =>
+            item.name === file.name &&
+            item.size === file.size &&
+            item.lastModified === file.lastModified
+        )
+    );
+
+    return unique.slice(0, 5);
+  });
+
+  const totalAfterAdd = selectedPhotos.length + accepted.length;
+
+  if (totalAfterAdd > 5) {
+    rejected.push("Only the first 5 valid photos were added.");
+  }
+
+  if (rejected.length > 0) {
+    setUploadWarning(rejected.join(" "));
+  } else {
+    setUploadWarning("");
+  }
+
+  setFormError("");
+}
+
+  async function handleCreateRequest(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-
-    if (!user?.tenant?.id) {
-      setFormError("Tenant account is not linked correctly.");
-      return;
-    }
-
-    if (!user?.tenant?.property?.id) {
-      setFormError("No property is linked to this tenant.");
-      return;
-    }
 
     if (!form.title.trim()) {
       setFormError("Title is required.");
@@ -332,46 +439,53 @@ export default function TenantMaintenancePage() {
       setSubmitting(true);
       setFormError("");
 
-      const payload = {
-        title: form.title.trim(),
-        description: form.description.trim() || null,
-        category: form.category,
-        priority: form.priority,
-        propertyId: user.tenant.property.id,
-        unitId: user?.tenant?.unit?.id || null,
-        tenantId: user.tenant.id,
-        preferredDate: form.preferredDate || null,
-        entryPermission: form.entryPermission,
-        locationNote: form.locationNote.trim() || null,
-      };
+      const formData = new FormData();
+
+      formData.append("title", form.title.trim());
+      formData.append("description", form.description.trim());
+      formData.append("category", form.category);
+      formData.append("priority", form.priority);
+      formData.append("preferredDate", form.preferredDate || "");
+      formData.append("entryPermission", String(form.entryPermission));
+      formData.append("locationNote", form.locationNote.trim());
+
+      selectedPhotos.forEach((file) => {
+        formData.append("photos", file);
+      });
 
       const token = localStorage.getItem("token");
 
-      const res = await fetch(`${API_URL}/api/maintenance`, {
+      const res = await fetch(`${API_BASE}/api/tenant/maintenance`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
           Authorization: `Bearer ${token || ""}`,
         },
-        body: JSON.stringify(payload),
+        body: formData,
       });
 
       const data = await res.json().catch(() => null);
 
+      if (res.status === 401) {
+        setFormError("Session rejected. Please login again.");
+        return;
+      }
+
       if (!res.ok) {
+        if (data?.code === "FILE_TOO_LARGE") {
+          throw new Error(
+            "One or more images are too large. Maximum allowed size is 5MB per image."
+          );
+        }
+
+        if (data?.code === "TOO_MANY_FILES") {
+          throw new Error("You can upload up to 5 photos only.");
+        }
+
         throw new Error(data?.error || "Failed to create maintenance request.");
       }
 
       setShowCreateModal(false);
-      setForm({
-        title: "",
-        description: "",
-        category: "GENERAL",
-        priority: "MEDIUM",
-        preferredDate: "",
-        entryPermission: false,
-        locationNote: "",
-      });
+      resetCreateForm();
 
       await loadMaintenanceData();
     } catch (err: any) {
@@ -421,7 +535,7 @@ export default function TenantMaintenancePage() {
   if (checkingAuth || loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#f4f7fb]">
-        <div className="flex items-center gap-3 rounded-3xl border border-slate-200 bg-white px-8 py-6 shadow-xl text-slate-700">
+        <div className="flex items-center gap-3 rounded-3xl border border-slate-200 bg-white px-8 py-6 text-slate-700 shadow-xl">
           <Loader2 className="h-5 w-5 animate-spin" />
           Loading maintenance...
         </div>
@@ -484,32 +598,13 @@ export default function TenantMaintenancePage() {
               </p>
 
               <div className="space-y-2">
-                <SidebarItem
-                  label="Overview"
-                  icon={<Home size={18} />}
-                  href="/tenant"
-                />
-                <SidebarItem
-                  label="Payments"
-                  icon={<CreditCard size={18} />}
-                  href="/tenant/payments"
-                />
-                <SidebarItem
-                  label="Maintenance"
-                  icon={<Wrench size={18} />}
-                  active
-                  href="/tenant/maintenance"
-                />
-                <SidebarItem
-                  label="Documents"
-                  icon={<FileText size={18} />}
-                  href="/tenant/documents"
-                />
-                <SidebarItem
-                  label="Notifications"
-                  icon={<Bell size={18} />}
-                  href="/tenant/notifications"
-                />
+                <SidebarItem label="Overview" icon={<Home size={18} />} href="/tenant" />
+                <SidebarItem label="Payments" icon={<CreditCard size={18} />} href="/tenant/payments" />
+                <SidebarItem label="Maintenance" icon={<Wrench size={18} />} active href="/tenant/maintenance" />
+                <SidebarItem label="Documents" icon={<FileText size={18} />} href="/tenant/documents" />
+                <SidebarItem label="Notifications" icon={<Bell size={18} />} href="/tenant/notifications" />
+                <SidebarItem label="Contact Landlord" icon={<MessageCircle size={18} />} href="/tenant/contact" />
+                <SidebarItem label="Settings" icon={<Settings size={18} />} href="/tenant/settings" />
               </div>
             </nav>
           </div>
@@ -546,8 +641,7 @@ export default function TenantMaintenancePage() {
                   Maintenance Requests
                 </h2>
                 <p className="mt-3 max-w-3xl text-base leading-7 text-slate-500">
-                  Follow your maintenance requests, check their progress, and
-                  submit new issues directly from your tenant workspace.
+                  Follow your maintenance requests, check their progress, and submit new issues with photos directly from your tenant workspace.
                 </p>
               </div>
 
@@ -561,7 +655,7 @@ export default function TenantMaintenancePage() {
 
                 <button
                   onClick={() => {
-                    setFormError("");
+                    resetCreateForm();
                     setShowCreateModal(true);
                   }}
                   className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700"
@@ -575,49 +669,20 @@ export default function TenantMaintenancePage() {
 
           <div className="p-6 md:p-8">
             <section className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-              <KpiCard
-                title="Open Requests"
-                value={String(openCount)}
-                subtitle="Waiting for action"
-                icon={<Clock3 className="h-5 w-5" />}
-                accent="amber"
-              />
-              <KpiCard
-                title="In Progress"
-                value={String(inProgressCount)}
-                subtitle="Currently being handled"
-                icon={<Wrench className="h-5 w-5" />}
-                accent="blue"
-              />
-              <KpiCard
-                title="Resolved / Closed"
-                value={String(resolvedCount)}
-                subtitle="Completed issues"
-                icon={<CheckCircle2 className="h-5 w-5" />}
-                accent="emerald"
-              />
-              <KpiCard
-                title="High Priority"
-                value={String(urgentCount)}
-                subtitle="Urgent or important issues"
-                icon={<AlertTriangle className="h-5 w-5" />}
-                accent="rose"
-              />
+              <KpiCard title="Open Requests" value={String(openCount)} subtitle="Waiting for action" icon={<Clock3 className="h-5 w-5" />} accent="amber" />
+              <KpiCard title="In Progress" value={String(inProgressCount)} subtitle="Currently being handled" icon={<Wrench className="h-5 w-5" />} accent="blue" />
+              <KpiCard title="Resolved / Closed" value={String(resolvedCount)} subtitle="Completed issues" icon={<CheckCircle2 className="h-5 w-5" />} accent="emerald" />
+              <KpiCard title="High Priority" value={String(urgentCount)} subtitle="Urgent or important issues" icon={<AlertTriangle className="h-5 w-5" />} accent="rose" />
             </section>
 
             <section className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-3">
-              <div className="xl:col-span-2 rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-2xl font-semibold text-slate-900">
-                      Request History
-                    </h3>
-                    <p className="mt-1 text-sm text-slate-500">
-                      View all maintenance requests linked to your tenant
-                      account.
-                    </p>
-                  </div>
-                </div>
+              <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm xl:col-span-2">
+                <h3 className="text-2xl font-semibold text-slate-900">
+                  Request History
+                </h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  View all maintenance requests linked to your tenant account.
+                </p>
 
                 <div className="mt-6 space-y-4">
                   {requests.length === 0 ? (
@@ -640,19 +705,11 @@ export default function TenantMaintenancePage() {
                                   {item.title}
                                 </h4>
 
-                                <span
-                                  className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadge(
-                                    item.status
-                                  )}`}
-                                >
+                                <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadge(item.status)}`}>
                                   {item.status?.replaceAll("_", " ")}
                                 </span>
 
-                                <span
-                                  className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getPriorityBadge(
-                                    item.priority
-                                  )}`}
-                                >
+                                <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getPriorityBadge(item.priority)}`}>
                                   {item.priority}
                                 </span>
                               </div>
@@ -665,48 +722,43 @@ export default function TenantMaintenancePage() {
                                 {item.description || "No description provided."}
                               </p>
 
+                              {Array.isArray(item.photos) && item.photos.length > 0 && (
+                                <div className="mt-4">
+                                  <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-slate-500">
+                                    <ImageIcon className="h-4 w-4" />
+                                    Attached Photos
+                                  </p>
+
+                                  <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                                    {item.photos.slice(0, 4).map((photo, index) => (
+                                      <a
+                                        key={`${photo.url}-${index}`}
+                                        href={getPhotoUrl(photo.url)}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="group overflow-hidden rounded-2xl border border-slate-200 bg-white"
+                                      >
+                                        <img
+                                          src={getPhotoUrl(photo.url)}
+                                          alt={photo.fileName || "Maintenance photo"}
+                                          className="h-24 w-full object-cover transition group-hover:scale-105"
+                                        />
+                                      </a>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
                               <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                                <InfoPill
-                                  icon={<CalendarDays className="h-4 w-4" />}
-                                  text={`Created: ${formatDate(item.createdAt)}`}
-                                />
-                                <InfoPill
-                                  icon={<Wrench className="h-4 w-4" />}
-                                  text={`Category: ${item.category?.replaceAll(
-                                    "_",
-                                    " "
-                                  )}`}
-                                />
-                                <InfoPill
-                                  icon={<MapPin className="h-4 w-4" />}
-                                  text={`Unit: ${
-                                    item.unit?.unitCode || "N/A"
-                                  }`}
-                                />
-                                <InfoPill
-                                  icon={<ShieldCheck className="h-4 w-4" />}
-                                  text={
-                                    item.entryPermission
-                                      ? "Entry allowed"
-                                      : "Entry not allowed"
-                                  }
-                                />
+                                <InfoPill icon={<CalendarDays className="h-4 w-4" />} text={`Created: ${formatDate(item.createdAt)}`} />
+                                <InfoPill icon={<Wrench className="h-4 w-4" />} text={`Category: ${item.category?.replaceAll("_", " ")}`} />
+                                <InfoPill icon={<MapPin className="h-4 w-4" />} text={`Unit: ${item.unit?.unitCode || "N/A"}`} />
+                                <InfoPill icon={<ShieldCheck className="h-4 w-4" />} text={item.entryPermission ? "Entry allowed" : "Entry not allowed"} />
                               </div>
 
                               <div className="mt-4 grid gap-3 md:grid-cols-2">
-                                <InfoPill
-                                  icon={<UserCircle2 className="h-4 w-4" />}
-                                  text={`Contractor: ${
-                                    item.contractor?.companyName ||
-                                    "Not assigned yet"
-                                  }`}
-                                />
-                                <InfoPill
-                                  icon={<BadgeDollarSign className="h-4 w-4" />}
-                                  text={`Estimate: ${formatMoney(
-                                    item.estimatedCost
-                                  )}`}
-                                />
+                                <InfoPill icon={<UserCircle2 className="h-4 w-4" />} text={`Contractor: ${item.contractor?.companyName || "Not assigned yet"}`} />
+                                <InfoPill icon={<BadgeDollarSign className="h-4 w-4" />} text={`Estimate: ${formatMoney(item.estimatedCost)}`} />
                               </div>
                             </div>
                           </div>
@@ -764,15 +816,9 @@ export default function TenantMaintenancePage() {
                         "N/A"
                       }
                     />
-                    <SummaryRow
-                      label="Total Requests"
-                      value={String(requests.length)}
-                    />
+                    <SummaryRow label="Total Requests" value={String(requests.length)} />
                     <SummaryRow label="Open" value={String(openCount)} />
-                    <SummaryRow
-                      label="Resolved"
-                      value={String(resolvedCount)}
-                    />
+                    <SummaryRow label="Resolved" value={String(resolvedCount)} />
                   </div>
                 </div>
 
@@ -792,10 +838,7 @@ export default function TenantMaintenancePage() {
                       </p>
 
                       <div className="mt-5 space-y-2 text-sm text-blue-100">
-                        <p>
-                          Status:{" "}
-                          {latestRequest.status?.replaceAll("_", " ")}
-                        </p>
+                        <p>Status: {latestRequest.status?.replaceAll("_", " ")}</p>
                         <p>Priority: {latestRequest.priority}</p>
                         <p>Date: {formatDate(latestRequest.createdAt)}</p>
                         <p>Request #: {latestRequest.requestNumber}</p>
@@ -809,27 +852,17 @@ export default function TenantMaintenancePage() {
                 </div>
 
                 <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-2xl font-semibold text-slate-900">
-                        Continue
-                      </h3>
-                      <p className="mt-1 text-sm text-slate-500">
-                        Navigate to another section.
-                      </p>
-                    </div>
-                  </div>
+                  <h3 className="text-2xl font-semibold text-slate-900">
+                    Continue
+                  </h3>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Navigate to another section.
+                  </p>
 
                   <div className="mt-6 space-y-3">
                     <QuickLink href="/tenant" label="Back to Overview" />
-                    <QuickLink
-                      href="/tenant/payments"
-                      label="Open Payments"
-                    />
-                    <QuickLink
-                      href="/tenant/documents"
-                      label="Open Documents"
-                    />
+                    <QuickLink href="/tenant/payments" label="Open Payments" />
+                    <QuickLink href="/tenant/documents" label="Open Documents" />
                   </div>
                 </div>
               </div>
@@ -841,19 +874,29 @@ export default function TenantMaintenancePage() {
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl">
-            <div className="border-b border-slate-200 px-6 py-5 md:px-8">
-              <h2 className="text-2xl font-bold text-slate-900">
-                Create Maintenance Request
-              </h2>
-              <p className="mt-2 text-sm text-slate-500">
-                Submit a new issue for your property or unit.
-              </p>
+            <div className="flex items-start justify-between border-b border-slate-200 px-6 py-5 md:px-8">
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900">
+                  Create Maintenance Request
+                </h2>
+                <p className="mt-2 text-sm text-slate-500">
+                  Submit a new issue for your property or unit. You can attach up to 5 photos.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCreateModal(false);
+                  resetCreateForm();
+                }}
+                className="rounded-2xl border border-slate-200 p-2 text-slate-500 hover:bg-slate-50"
+              >
+                <X className="h-5 w-5" />
+              </button>
             </div>
 
-            <form
-              onSubmit={handleCreateRequest}
-              className="overflow-y-auto p-6 md:p-8 space-y-5"
-            >
+            <form onSubmit={handleCreateRequest} className="space-y-5 overflow-y-auto p-6 md:p-8">
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700">
                   Title
@@ -973,6 +1016,77 @@ export default function TenantMaintenancePage() {
                 </div>
               </div>
 
+              <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-5">
+                <label className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-700">
+                  <Camera className="h-4 w-4" />
+                  Photos
+                </label>
+
+                <label className="flex cursor-pointer flex-col items-center justify-center rounded-3xl border border-dashed border-blue-300 bg-white px-6 py-8 text-center transition hover:border-blue-500 hover:bg-blue-50">
+                  <Camera className="mb-3 h-8 w-8 text-blue-600" />
+                  <span className="text-sm font-semibold text-slate-800">
+                    Click to upload photos
+                  </span>
+                  <span className="mt-1 text-xs text-slate-500">
+                    JPG, PNG, WEBP · Max 5 photos · 5MB each
+                  </span>
+
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => handlePhotoChange(e.target.files)}
+                  />
+                </label>
+
+                {selectedPhotos.length > 0 && (
+                  <div className="mt-5 grid grid-cols-2 gap-4 md:grid-cols-3">
+                    {selectedPhotos.map((file, index) => {
+                      const previewUrl = URL.createObjectURL(file);
+
+                      return (
+                        <div
+                          key={`${file.name}-${index}`}
+                          className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+                        >
+                          <div className="relative">
+                            <img
+                              src={previewUrl}
+                              alt={file.name}
+                              className="h-28 w-full object-cover"
+                            />
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedPhotos((prev) =>
+                                  prev.filter((_, photoIndex) => photoIndex !== index)
+                                );
+                                setUploadWarning("");
+                                setFormError("");
+                              }}
+                              className="absolute right-2 top-2 rounded-full bg-black/70 p-1.5 text-white transition hover:bg-red-600"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+
+                          <div className="p-3">
+                            <p className="truncate text-xs font-semibold text-slate-700">
+                              {file.name}
+                            </p>
+                            <p className="mt-1 text-xs text-slate-500">
+                              {formatFileSize(file.size)}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
               <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
                 <input
                   type="checkbox"
@@ -990,9 +1104,19 @@ export default function TenantMaintenancePage() {
                 </span>
               </label>
 
-              {formError && (
-                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                  {formError}
+              {(formError || uploadWarning) && (
+                <div className="rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+                    <div>
+                      <p className="font-semibold">Some photos could not be added</p>
+                      <p className="mt-1 leading-6">{formError || uploadWarning}</p>
+                      <p className="mt-2 text-xs text-amber-700">
+                        Please upload JPG, PNG, or WEBP files. Maximum size: 5MB per image.
+                        Maximum photos: 5.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -1001,7 +1125,7 @@ export default function TenantMaintenancePage() {
                   type="button"
                   onClick={() => {
                     setShowCreateModal(false);
-                    setFormError("");
+                    resetCreateForm();
                   }}
                   disabled={submitting}
                   className="rounded-2xl border border-slate-300 px-5 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
@@ -1085,9 +1209,7 @@ function KpiCard({
   return (
     <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
       <div className="flex items-start justify-between">
-        <div
-          className={`h-2 w-16 rounded-full bg-gradient-to-r ${accentMap[accent]}`}
-        />
+        <div className={`h-2 w-16 rounded-full bg-gradient-to-r ${accentMap[accent]}`} />
         <div className="rounded-2xl bg-slate-50 p-3 text-slate-500">
           {icon}
         </div>
@@ -1102,13 +1224,7 @@ function KpiCard({
   );
 }
 
-function SummaryRow({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
+function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
       <span className="text-sm text-slate-600">{label}</span>
@@ -1117,13 +1233,7 @@ function SummaryRow({
   );
 }
 
-function QuickLink({
-  href,
-  label,
-}: {
-  href: string;
-  label: string;
-}) {
+function QuickLink({ href, label }: { href: string; label: string }) {
   return (
     <Link href={href}>
       <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium text-slate-700 transition hover:bg-slate-100">
@@ -1142,13 +1252,7 @@ function EmptyState({ text }: { text: string }) {
   );
 }
 
-function InfoPill({
-  icon,
-  text,
-}: {
-  icon: React.ReactNode;
-  text: string;
-}) {
+function InfoPill({ icon, text }: { icon: React.ReactNode; text: string }) {
   return (
     <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-3 text-xs font-medium text-slate-600">
       <span className="text-slate-400">{icon}</span>

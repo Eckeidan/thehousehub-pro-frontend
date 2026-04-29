@@ -24,7 +24,7 @@ import {
   Home,
   ShieldCheck,
   Wrench,
-  Trash2,
+  AlertCircle,
 } from "lucide-react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
@@ -141,11 +141,11 @@ export default function NewUnitPage() {
       const token = localStorage.getItem("token");
 
       const res = await fetch(`${API_BASE}/api/properties`, {
-  cache: "no-store",
-  headers: {
-    Authorization: `Bearer ${token || ""}`,
-  },
-});
+        cache: "no-store",
+        headers: {
+          Authorization: `Bearer ${token || ""}`,
+        },
+      });
 
       if (res.status === 401) {
         localStorage.removeItem("token");
@@ -181,6 +181,12 @@ export default function NewUnitPage() {
     }));
   }
 
+  function toOptionalNumber(value: string) {
+    if (value === "") return null;
+    const numberValue = Number(value);
+    return Number.isFinite(numberValue) ? numberValue : null;
+  }
+
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
@@ -195,29 +201,38 @@ export default function NewUnitPage() {
       return;
     }
 
+    const rentValue = Number(form.monthlyRent);
+
+    if (!form.monthlyRent || !Number.isFinite(rentValue) || rentValue <= 0) {
+      setError(
+        "Monthly Rent is required. Please enter a valid amount greater than 0."
+      );
+      return;
+    }
+
     try {
       setLoading(true);
 
       const token = localStorage.getItem("token");
 
       const res = await fetch(`${API_BASE}/api/units`, {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${token || ""}`,
-  },
-  body: JSON.stringify({
-    propertyId: form.propertyId,
-    unitName: form.unitName.trim() || null,
-    floor: form.floor !== "" ? Number(form.floor) : null,
-    bedrooms: form.bedrooms !== "" ? Number(form.bedrooms) : null,
-    bathrooms: form.bathrooms !== "" ? Number(form.bathrooms) : null,
-    areaSqm: form.areaSqm !== "" ? Number(form.areaSqm) : null,
-    monthlyRent: form.monthlyRent !== "" ? Number(form.monthlyRent) : null,
-    occupancyStatus: form.occupancyStatus || "AVAILABLE",
-    notes: form.notes.trim() || null,
-  }),
-});
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token || ""}`,
+        },
+        body: JSON.stringify({
+          propertyId: form.propertyId,
+          unitName: form.unitName.trim() || null,
+          floor: toOptionalNumber(form.floor),
+          bedrooms: toOptionalNumber(form.bedrooms),
+          bathrooms: toOptionalNumber(form.bathrooms),
+          areaSqm: toOptionalNumber(form.areaSqm),
+          monthlyRent: rentValue,
+          occupancyStatus: form.occupancyStatus || "AVAILABLE",
+          notes: form.notes.trim() || null,
+        }),
+      });
 
       if (res.status === 401) {
         localStorage.removeItem("token");
@@ -244,7 +259,7 @@ export default function NewUnitPage() {
   if (checkingAuth) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-100 p-8">
-        <div className="rounded-3xl border border-slate-200 bg-white px-8 py-6 shadow-xl text-slate-700">
+        <div className="rounded-3xl border border-slate-200 bg-white px-8 py-6 text-slate-700 shadow-xl">
           Checking session...
         </div>
       </div>
@@ -258,7 +273,7 @@ export default function NewUnitPage() {
           <div className="border-b border-white/10 px-6 py-7">
             <h1 className="text-3xl font-bold tracking-tight">The House Hub</h1>
             <p className="mt-2 text-sm text-blue-100/70">
-              The Morden home management platform.
+              The modern home management platform.
             </p>
           </div>
 
@@ -354,16 +369,25 @@ export default function NewUnitPage() {
             )}
 
             {error && (
-              <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                {error}
+              <div className="mb-4 flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+                <span>{error}</span>
               </div>
             )}
+
+            <div className="mb-6 rounded-2xl border border-blue-100 bg-blue-50 px-5 py-4 text-sm text-blue-800">
+              <p className="font-semibold">Important rental data</p>
+              <p className="mt-1">
+                Monthly Rent is required because tenant portal payments depend on this value.
+                If it is empty, the tenant dashboard may show $0.
+              </p>
+            </div>
 
             <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700">
-                    Property
+                    Property <span className="text-rose-500">*</span>
                   </label>
                   <select
                     name="propertyId"
@@ -463,16 +487,23 @@ export default function NewUnitPage() {
 
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700">
-                    Monthly Rent
+                    Monthly Rent <span className="text-rose-500">*</span>
                   </label>
                   <input
                     name="monthlyRent"
                     type="number"
+                    required
+                    min="1"
+                    step="0.01"
                     value={form.monthlyRent}
                     onChange={handleChange}
+                    placeholder="Example: 800"
                     disabled={!canEdit}
                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 disabled:cursor-not-allowed disabled:bg-slate-100"
                   />
+                  <p className="mt-1 text-xs text-slate-500">
+                    Required. This amount is used in the tenant dashboard and payment center.
+                  </p>
                 </div>
 
                 <div>

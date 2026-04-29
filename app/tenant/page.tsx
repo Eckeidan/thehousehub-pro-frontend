@@ -11,12 +11,14 @@ import {
   Bell,
   LogOut,
   UserCircle2,
+  MessageCircle,
   MapPin,
   CalendarDays,
   BadgeCheck,
   Wallet,
   Clock3,
   ArrowRight,
+  Settings, 
   Loader2,
   Building2,
   Phone,
@@ -415,7 +417,9 @@ export default function TenantPortalPage() {
                 <SidebarItem label="Payments" icon={<CreditCard size={18} />} href="/tenant/payments" />
                 <SidebarItem label="Maintenance" icon={<Wrench size={18} />} href="/tenant/maintenance" />
                 <SidebarItem label="Documents" icon={<FileText size={18} />} href="/tenant/documents" />
+                <TenantNav label="Contact Landlord" href="/tenant/contact" icon={<MessageCircle size={18} />} />
                 <SidebarItem label="Notifications" icon={<Bell size={18} />} href="/tenant/notifications" />
+                <TenantNav label="Settings" href="/tenant/settings" icon={<Settings size={18} />}  />
               </div>
             </nav>
           </div>
@@ -846,6 +850,33 @@ function InfoCard({
         </div>
       </div>
     </div>
+  );
+}
+
+function TenantNav({
+  label,
+  href,
+  icon,
+  active = false,
+}: {
+  label: string;
+  href: string;
+  icon: React.ReactNode;
+  active?: boolean;
+}) {
+  return (
+    <Link href={href}>
+      <div
+        className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition ${
+          active
+            ? "bg-white/15 text-white"
+            : "text-blue-100/80 hover:bg-white/10 hover:text-white"
+        }`}
+      >
+        {icon}
+        {label}
+      </div>
+    </Link>
   );
 }
 

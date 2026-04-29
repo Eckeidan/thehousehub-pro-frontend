@@ -10,6 +10,7 @@ import {
   Wrench,
   Wallet,
   FileText,
+  MessageCircle,
   Brain,
   Settings,
   LogOut,
@@ -271,6 +272,8 @@ export default function DashboardPage() {
                 icon={<Wallet size={18} />}
                 href="/payments"
               />
+
+              <SidebarItem label="Messages" icon={<MessageCircle size={18} />} href="/communications"  />
               <SidebarItem
                 label="Documents"
                 icon={<FileText size={18} />}
