@@ -28,9 +28,13 @@ import {
   Brain,
   ThumbsUp,
   ThumbsDown,
+  ChevronLeft,
+  ChevronRight,
   RefreshCw,
-  Package,
   ClipboardList,
+  Package,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
@@ -249,6 +253,7 @@ export default function MaintenanceDetailsPage() {
   const [approvingSuggestion, setApprovingSuggestion] = useState(false);
   const [rejectingSuggestion, setRejectingSuggestion] = useState(false);
   const [refreshingSuggestion, setRefreshingSuggestion] = useState(false);
+  const [autoGeneratingSuggestion, setAutoGeneratingSuggestion] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -270,10 +275,9 @@ export default function MaintenanceDetailsPage() {
     adminNotes: "",
   });
 
-  const [selectedPhoto, setSelectedPhoto] = useState<{
-  url: string;
-  fileName?: string;
-} | null>(null);
+  const [photoIndex, setPhotoIndex] = useState<number | null>(null);
+
+  const [zoom, setZoom] = useState(1);
 
 
   useEffect(() => {
@@ -311,6 +315,10 @@ export default function MaintenanceDetailsPage() {
   }, [checkingAuth, id]);
 
   useEffect(() => {
+  setZoom(1);
+}, [photoIndex]);
+
+  useEffect(() => {
     const labor = toNumber(form.estimatedLaborCost);
     const materials = toNumber(form.estimatedMaterialsCost);
 
@@ -322,6 +330,43 @@ export default function MaintenanceDetailsPage() {
       }));
     }
   }, [form.estimatedLaborCost, form.estimatedMaterialsCost]);
+
+  useEffect(() => {
+  async function autoGenerateAI() {
+    if (!request?.id) return;
+    if (recommendation) return;
+
+    try {
+      setAutoGeneratingSuggestion(true);
+
+      const token = localStorage.getItem("token");
+
+      const res = await fetch(
+        `${API_BASE}/api/maintenance/${request.id}/recommendation/refresh`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token || ""}`,
+          },
+        }
+      );
+
+      const data = await res.json().catch(() => null);
+
+      if (res.ok && data?.id) {
+        setRecommendation(data);
+      } else {
+        console.warn("Auto AI suggestion skipped:", data);
+      }
+    } catch (err) {
+      console.error("Auto AI suggestion error:", err);
+    } finally {
+      setAutoGeneratingSuggestion(false);
+    }
+  }
+
+  autoGenerateAI();
+}, [request?.id, recommendation]);
 
   async function loadData() {
     try {
@@ -377,11 +422,16 @@ export default function MaintenanceDetailsPage() {
 
       setContractors(activeContractors);
 
-      if (recommendationRes.ok) {
-        setRecommendation(recommendationData);
-      } else {
-        setRecommendation(null);
-      }
+      if (recommendationRes.ok && recommendationData?.id) {
+  setRecommendation(recommendationData);
+} else if (
+  Array.isArray(requestData?.aiRecommendations) &&
+  requestData.aiRecommendations.length > 0
+) {
+  setRecommendation(requestData.aiRecommendations[0]);
+} else {
+  setRecommendation(null);
+}
 
       setForm({
         contractorId: requestData?.contractor?.id || "",
@@ -709,6 +759,13 @@ export default function MaintenanceDetailsPage() {
 
   if (!request) return null;
 
+  const photos = Array.isArray(request?.photos) ? request.photos : [];
+
+const activePhoto =
+  photoIndex !== null && photos[photoIndex]
+    ? photos[photoIndex]
+    : null;
+
   return (
     <div className="min-h-screen bg-slate-100 px-4 py-8 md:px-6 md:py-10">
       <div className="mx-auto max-w-7xl space-y-6">
@@ -732,7 +789,7 @@ export default function MaintenanceDetailsPage() {
             onClick={handleGenerateSuggestion}
             className="inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
           >
-            {refreshingSuggestion ? (
+            {refreshingSuggestion || autoGeneratingSuggestion ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <RefreshCw className="h-4 w-4" />
@@ -798,46 +855,39 @@ export default function MaintenanceDetailsPage() {
               </Panel>
 
               <Panel
-  title="Attached Photos"
-  icon={<ImageIcon className="h-5 w-5 text-slate-500" />}
->
-  {Array.isArray(request.photos) && request.photos.length > 0 ? (
-    <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
-      {request.photos.map((photo, index) => (
-        <button
-          type="button"
-          key={`${photo.url}-${index}`}
-          onClick={() =>
-            setSelectedPhoto({
-              url: getPhotoUrl(photo.url),
-              fileName: photo.fileName || `Photo ${index + 1}`,
-            })
-          }
-          className="group overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-sm"
-        >
-          <img
-            src={getPhotoUrl(photo.url)}
-            alt={photo.fileName || "Maintenance photo"}
-            className="h-40 w-full object-cover transition group-hover:scale-105"
-          />
+                  title="Attached Photos"
+                  icon={<ImageIcon className="h-5 w-5 text-slate-500" />}
+                >
+                  {Array.isArray(request.photos) && request.photos.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+                      {request.photos.map((photo, index) => (
+                        <button
+                          type="button"
+                          key={`${photo.url}-${index}`}
+                          onClick={() => setPhotoIndex(index)}
+                          className="group overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-sm transition hover:-translate-y-1 hover:shadow-md"
+                        >
+                          <img
+                            src={getPhotoUrl(photo.url)}
+                            alt={photo.fileName || "Maintenance photo"}
+                            className="h-40 w-full object-cover transition group-hover:scale-105"
+                          />
 
-          <div className="p-3">
-            <p className="truncate text-xs font-semibold text-slate-700">
-              {photo.fileName || `Photo ${index + 1}`}
-            </p>
-            <p className="mt-1 text-xs text-slate-500">
-              Click to open
-            </p>
-          </div>
-        </button>
-      ))}
-    </div>
-  ) : (
-    <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-5 text-sm text-slate-500">
-      No photos attached to this maintenance request.
-    </div>
-  )}
-</Panel>
+                          <div className="p-3">
+                            <p className="truncate text-xs font-semibold text-slate-700">
+                              {photo.fileName || `Photo ${index + 1}`}
+                            </p>
+                            <p className="mt-1 text-xs text-slate-500">Click to open</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-5 text-sm text-slate-500">
+                      No photos attached to this maintenance request.
+                    </div>
+                  )}
+                </Panel>
 
               <Panel
                 title="Request Details"
@@ -1043,18 +1093,22 @@ export default function MaintenanceDetailsPage() {
                     <button
                       type="button"
                       onClick={handleGenerateSuggestion}
-                      disabled={refreshingSuggestion}
+                      disabled={refreshingSuggestion || autoGeneratingSuggestion}
                       className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      {refreshingSuggestion ? (
+                      {refreshingSuggestion || autoGeneratingSuggestion ? (
                         <>
                           <Loader2 className="h-4 w-4 animate-spin" />
-                          Generating...
+                          {autoGeneratingSuggestion ? "Auto generating..." : "Generating..."}
                         </>
                       ) : (
                         <>
                           <Sparkles className="h-4 w-4" />
-                          Generate AI Suggestion
+                          {autoGeneratingSuggestion
+                            ? "Auto generating..."
+                            : refreshingSuggestion
+                            ? "Generating..."
+                            : "Generate AI"}
                         </>
                       )}
                     </button>
@@ -1383,38 +1437,85 @@ export default function MaintenanceDetailsPage() {
 
 
 
-      {selectedPhoto && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-    <div className="relative w-full max-w-5xl overflow-hidden rounded-3xl bg-white shadow-2xl">
-      <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-        <div>
-          <p className="text-sm font-semibold text-slate-900">
-            Maintenance Photo
-          </p>
-          <p className="text-xs text-slate-500">
-            {selectedPhoto.fileName}
-          </p>
-        </div>
 
-        <button
-          type="button"
-          onClick={() => setSelectedPhoto(null)}
-          className="rounded-full bg-slate-100 p-2 text-slate-600 hover:bg-slate-200"
-        >
-          <XCircle className="h-5 w-5" />
-        </button>
-      </div>
 
-      <div className="max-h-[78vh] bg-slate-950 p-4">
-        <img
-          src={selectedPhoto.url}
-          alt={selectedPhoto.fileName || "Maintenance photo"}
-          className="mx-auto max-h-[72vh] w-auto rounded-2xl object-contain"
-        />
-      </div>
+      {photoIndex !== null && activePhoto && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm">
+    <button
+      onClick={() => setPhotoIndex(null)}
+      className="absolute right-6 top-6 rounded-full bg-white p-2 shadow-lg hover:bg-slate-100"
+    >
+      <XCircle className="h-6 w-6 text-slate-700" />
+    </button>
+
+    <div className="absolute left-6 top-6 flex gap-2">
+      <button
+        onClick={() => setZoom((z) => Math.min(z + 0.3, 3))}
+        className="rounded-full bg-white p-2 shadow hover:bg-slate-100"
+      >
+        <ZoomIn className="h-5 w-5" />
+      </button>
+
+      <button
+        onClick={() => setZoom((z) => Math.max(z - 0.3, 1))}
+        className="rounded-full bg-white p-2 shadow hover:bg-slate-100"
+      >
+        <ZoomOut className="h-5 w-5" />
+      </button>
+
+      <button
+        onClick={() => setZoom(1)}
+        className="rounded-full bg-white px-3 py-2 text-xs font-semibold shadow"
+      >
+        Reset
+      </button>
+    </div>
+
+    {photos.length > 1 && (
+      <button
+        onClick={() =>
+          setPhotoIndex((prev) =>
+            prev === null ? 0 : prev === 0 ? photos.length - 1 : prev - 1
+          )
+        }
+        className="absolute left-6 rounded-full bg-white/90 p-3 shadow hover:bg-white"
+      >
+        <ChevronLeft className="h-6 w-6" />
+      </button>
+    )}
+
+    {photos.length > 1 && (
+      <button
+        onClick={() =>
+          setPhotoIndex((prev) =>
+            prev === null ? 0 : (prev + 1) % photos.length
+          )
+        }
+        className="absolute right-6 rounded-full bg-white/90 p-3 shadow hover:bg-white"
+      >
+        <ChevronRight className="h-6 w-6" />
+      </button>
+    )}
+
+    <div className="w-full max-w-6xl overflow-hidden px-4 text-center">
+      <img
+        src={getPhotoUrl(activePhoto.url)}
+        alt={activePhoto.fileName || "Preview"}
+        style={{ transform: `scale(${zoom})` }}
+        className="mx-auto max-h-[80vh] rounded-2xl object-contain shadow-2xl transition-transform duration-300"
+      />
+
+      <p className="mt-3 text-sm text-white/80">
+        {activePhoto.fileName || `Photo ${photoIndex + 1}`}
+      </p>
     </div>
   </div>
 )}
+
+
+
+
+
     </div>
   );
 }

@@ -84,6 +84,14 @@ export default function SettingsPage() {
     role: "ADMIN",
   });
 
+  const [changingPassword, setChangingPassword] = useState(false);
+
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+
   const [notification, setNotification] = useState<NotificationState>({
     open: false,
     type: "error",
@@ -401,6 +409,89 @@ export default function SettingsPage() {
       setCreatingUser(false);
     }
   }
+
+
+  async function handleChangePassword(e: React.FormEvent) {
+  e.preventDefault();
+
+  if (
+    !passwordForm.currentPassword.trim() ||
+    !passwordForm.newPassword.trim() ||
+    !passwordForm.confirmPassword.trim()
+  ) {
+    showNotification(
+      "error",
+      "Missing information",
+      "Please fill current password, new password and confirmation."
+    );
+    return;
+  }
+
+  if (passwordForm.newPassword.length < 8) {
+    showNotification(
+      "error",
+      "Weak password",
+      "New password must be at least 8 characters."
+    );
+    return;
+  }
+
+  if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+    showNotification(
+      "error",
+      "Password mismatch",
+      "New password and confirmation do not match."
+    );
+    return;
+  }
+
+  try {
+    setChangingPassword(true);
+    const token = localStorage.getItem("token");
+
+    const res = await fetch(`${API_BASE}/api/auth/change-password`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token || ""}`,
+      },
+      body: JSON.stringify(passwordForm),
+    });
+
+    if (res.status === 401) {
+      handleUnauthorized();
+      return;
+    }
+
+    const data = await res.json().catch(() => null);
+
+    if (!res.ok) {
+      throw new Error(data?.error || "Failed to change password");
+    }
+
+    setPasswordForm({
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
+    });
+
+    showNotification(
+      "success",
+      "Password changed",
+      "Your password has been updated successfully."
+    );
+  } catch (error: any) {
+    showNotification(
+      "error",
+      "Unable to change password",
+      error?.message || "Failed to change password"
+    );
+  } finally {
+    setChangingPassword(false);
+  }
+}
+
+
 
   const isError = notification.type === "error";
 
@@ -954,9 +1045,64 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                <button className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50">
-                  Change Password
-                </button>
+                <form onSubmit={handleChangePassword} className="space-y-4">
+  <input
+    type="password"
+    value={passwordForm.currentPassword}
+    onChange={(e) =>
+      setPasswordForm((prev) => ({
+        ...prev,
+        currentPassword: e.target.value,
+      }))
+    }
+    placeholder="Current password"
+    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 outline-none transition focus:border-[#1f3270] focus:bg-white"
+  />
+
+  <input
+    type="password"
+    value={passwordForm.newPassword}
+    onChange={(e) =>
+      setPasswordForm((prev) => ({
+        ...prev,
+        newPassword: e.target.value,
+      }))
+    }
+    placeholder="New password"
+    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 outline-none transition focus:border-[#1f3270] focus:bg-white"
+  />
+
+  <input
+    type="password"
+    value={passwordForm.confirmPassword}
+    onChange={(e) =>
+      setPasswordForm((prev) => ({
+        ...prev,
+        confirmPassword: e.target.value,
+      }))
+    }
+    placeholder="Confirm new password"
+    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 outline-none transition focus:border-[#1f3270] focus:bg-white"
+  />
+
+  <button
+    type="submit"
+    disabled={changingPassword}
+    className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-red-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+  >
+    {changingPassword ? (
+      <>
+        <Loader2 className="h-4 w-4 animate-spin" />
+        Updating...
+      </>
+    ) : (
+      <>
+        <Lock className="h-4 w-4" />
+        Change Password
+      </>
+    )}
+  </button>
+</form>
               </div>
 
               <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
