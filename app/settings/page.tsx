@@ -26,6 +26,8 @@ import {
   Mail,
   Lock,
   UserCog,
+  Palette,
+  CreditCard,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -66,10 +68,23 @@ export default function SettingsPage() {
   const [email, setEmail] = useState("");
   const [currency, setCurrency] = useState("USD");
   const [timezone, setTimezone] = useState("UTC");
+
+  const [logoUrl, setLogoUrl] = useState("");
+  const [primaryColor, setPrimaryColor] = useState("#1f3270");
+  const [supportEmail, setSupportEmail] = useState("");
+
+  const [bankName, setBankName] = useState("");
+  const [bankAccountName, setBankAccountName] = useState("");
+  const [bankAccountNumber, setBankAccountNumber] = useState("");
+  const [paymentInstructions, setPaymentInstructions] = useState("");
+  const [rentDueDay, setRentDueDay] = useState(1);
+  const [lateFeeAmount, setLateFeeAmount] = useState(0);
+
   const [tenantAccessDefault, setTenantAccessDefault] = useState(true);
   const [notifications, setNotifications] = useState(true);
   const [maintenanceAlerts, setMaintenanceAlerts] = useState(true);
   const [leaseReminders, setLeaseReminders] = useState(true);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -85,7 +100,6 @@ export default function SettingsPage() {
   });
 
   const [changingPassword, setChangingPassword] = useState(false);
-
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: "",
     newPassword: "",
@@ -174,6 +188,16 @@ export default function SettingsPage() {
     return () => clearTimeout(timer);
   }, [notification.open]);
 
+  useEffect(() => {
+    if (checkingAuth) return;
+    fetchSettings();
+  }, [checkingAuth]);
+
+  useEffect(() => {
+    if (checkingAuth || !isSuperAdmin) return;
+    fetchUsers();
+  }, [checkingAuth, isSuperAdmin]);
+
   async function fetchSettings() {
     try {
       setLoading(true);
@@ -201,6 +225,18 @@ export default function SettingsPage() {
       setEmail(data?.email || "");
       setCurrency(data?.currency || "USD");
       setTimezone(data?.timezone || "UTC");
+
+      setLogoUrl(data?.logoUrl || "");
+      setPrimaryColor(data?.primaryColor || "#1f3270");
+      setSupportEmail(data?.supportEmail || "");
+
+      setBankName(data?.bankName || "");
+      setBankAccountName(data?.bankAccountName || "");
+      setBankAccountNumber(data?.bankAccountNumber || "");
+      setPaymentInstructions(data?.paymentInstructions || "");
+      setRentDueDay(Number(data?.rentDueDay || 1));
+      setLateFeeAmount(Number(data?.lateFeeAmount || 0));
+
       setTenantAccessDefault(Boolean(data?.tenantAccessDefault));
       setNotifications(Boolean(data?.notifications));
       setMaintenanceAlerts(Boolean(data?.maintenanceAlerts));
@@ -253,16 +289,6 @@ export default function SettingsPage() {
     }
   }
 
-  useEffect(() => {
-    if (checkingAuth) return;
-    fetchSettings();
-  }, [checkingAuth]);
-
-  useEffect(() => {
-    if (checkingAuth || !isSuperAdmin) return;
-    fetchUsers();
-  }, [checkingAuth, isSuperAdmin]);
-
   async function handleSave() {
     if (!canEditSettings) {
       showNotification(
@@ -288,6 +314,18 @@ export default function SettingsPage() {
           email,
           currency,
           timezone,
+
+          logoUrl,
+          primaryColor,
+          supportEmail,
+
+          bankName,
+          bankAccountName,
+          bankAccountNumber,
+          paymentInstructions,
+          rentDueDay,
+          lateFeeAmount,
+
           tenantAccessDefault,
           notifications,
           maintenanceAlerts,
@@ -410,88 +448,85 @@ export default function SettingsPage() {
     }
   }
 
-
   async function handleChangePassword(e: React.FormEvent) {
-  e.preventDefault();
+    e.preventDefault();
 
-  if (
-    !passwordForm.currentPassword.trim() ||
-    !passwordForm.newPassword.trim() ||
-    !passwordForm.confirmPassword.trim()
-  ) {
-    showNotification(
-      "error",
-      "Missing information",
-      "Please fill current password, new password and confirmation."
-    );
-    return;
-  }
-
-  if (passwordForm.newPassword.length < 8) {
-    showNotification(
-      "error",
-      "Weak password",
-      "New password must be at least 8 characters."
-    );
-    return;
-  }
-
-  if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-    showNotification(
-      "error",
-      "Password mismatch",
-      "New password and confirmation do not match."
-    );
-    return;
-  }
-
-  try {
-    setChangingPassword(true);
-    const token = localStorage.getItem("token");
-
-    const res = await fetch(`${API_BASE}/api/auth/change-password`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token || ""}`,
-      },
-      body: JSON.stringify(passwordForm),
-    });
-
-    if (res.status === 401) {
-      handleUnauthorized();
+    if (
+      !passwordForm.currentPassword.trim() ||
+      !passwordForm.newPassword.trim() ||
+      !passwordForm.confirmPassword.trim()
+    ) {
+      showNotification(
+        "error",
+        "Missing information",
+        "Please fill current password, new password and confirmation."
+      );
       return;
     }
 
-    const data = await res.json().catch(() => null);
-
-    if (!res.ok) {
-      throw new Error(data?.error || "Failed to change password");
+    if (passwordForm.newPassword.length < 8) {
+      showNotification(
+        "error",
+        "Weak password",
+        "New password must be at least 8 characters."
+      );
+      return;
     }
 
-    setPasswordForm({
-      currentPassword: "",
-      newPassword: "",
-      confirmPassword: "",
-    });
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      showNotification(
+        "error",
+        "Password mismatch",
+        "New password and confirmation do not match."
+      );
+      return;
+    }
 
-    showNotification(
-      "success",
-      "Password changed",
-      "Your password has been updated successfully."
-    );
-  } catch (error: any) {
-    showNotification(
-      "error",
-      "Unable to change password",
-      error?.message || "Failed to change password"
-    );
-  } finally {
-    setChangingPassword(false);
+    try {
+      setChangingPassword(true);
+      const token = localStorage.getItem("token");
+
+      const res = await fetch(`${API_BASE}/api/auth/change-password`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token || ""}`,
+        },
+        body: JSON.stringify(passwordForm),
+      });
+
+      if (res.status === 401) {
+        handleUnauthorized();
+        return;
+      }
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(data?.error || "Failed to change password");
+      }
+
+      setPasswordForm({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+
+      showNotification(
+        "success",
+        "Password changed",
+        "Your password has been updated successfully."
+      );
+    } catch (error: any) {
+      showNotification(
+        "error",
+        "Unable to change password",
+        error?.message || "Failed to change password"
+      );
+    } finally {
+      setChangingPassword(false);
+    }
   }
-}
-
-
 
   const isError = notification.type === "error";
 
@@ -594,57 +629,16 @@ export default function SettingsPage() {
           </p>
 
           <div className="space-y-2">
-            <SidebarItem
-              label="Dashboard"
-              icon={<LayoutDashboard size={18} />}
-              href="/dashboard"
-            />
-            <SidebarItem
-              label="Properties"
-              icon={<Building2 size={18} />}
-              href="/properties"
-            />
-            <SidebarItem
-              label="Tenants"
-              icon={<Users size={18} />}
-              href="/tenants"
-            />
-            <SidebarItem
-              label="Units"
-              icon={<Home size={18} />}
-              href="/units"
-            />
-            <SidebarItem
-              label="Vendors"
-              icon={<Wrench size={18} />}
-              href="/vendors"
-            />
-            <SidebarItem
-              label="Maintenance"
-              icon={<Wrench size={18} />}
-              href="/maintenance"
-            />
-            <SidebarItem
-              label="Financials"
-              icon={<Wallet size={18} />}
-              href="/payments"
-            />
-            <SidebarItem
-              label="Documents"
-              icon={<FileText size={18} />}
-              href="/documents"
-            />
-            <SidebarItem
-              label="AI Insights"
-              icon={<Brain size={18} />}
-              href="/insights"
-            />
-            <SidebarItem
-              label="Settings"
-              icon={<Settings size={18} />}
-              active
-              href="/settings"
-            />
+            <SidebarItem label="Dashboard" icon={<LayoutDashboard size={18} />} href="/dashboard" />
+            <SidebarItem label="Properties" icon={<Building2 size={18} />} href="/properties" />
+            <SidebarItem label="Tenants" icon={<Users size={18} />} href="/tenants" />
+            <SidebarItem label="Units" icon={<Home size={18} />} href="/units" />
+            <SidebarItem label="Vendors" icon={<Wrench size={18} />} href="/vendors" />
+            <SidebarItem label="Maintenance" icon={<Wrench size={18} />} href="/maintenance" />
+            <SidebarItem label="Financials" icon={<Wallet size={18} />} href="/payments" />
+            <SidebarItem label="Documents" icon={<FileText size={18} />} href="/documents" />
+            <SidebarItem label="AI Insights" icon={<Brain size={18} />} href="/insights" />
+            <SidebarItem label="Settings" icon={<Settings size={18} />} active href="/settings" />
           </div>
         </nav>
 
@@ -684,7 +678,7 @@ export default function SettingsPage() {
                 Settings
               </h2>
               <p className="mt-3 text-xl text-slate-500">
-                Configure company details, system preferences, and security.
+                Configure company details, branding, payments, security and system preferences.
               </p>
             </div>
 
@@ -700,57 +694,80 @@ export default function SettingsPage() {
 
           {isSuperAdmin && (
             <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-700">
-              Super Admin mode: you can review all settings and manage Admin /
-              Owner accounts, but operational settings are read-only.
+              Super Admin mode: you can review all settings and manage Admin / Owner accounts, but operational settings are read-only.
             </div>
           )}
 
           <div className="grid gap-6 xl:grid-cols-3">
             <div className="space-y-6 xl:col-span-2">
-              <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="mb-6 flex items-center gap-3">
-                  <div className="rounded-2xl bg-blue-100 p-3 text-blue-600">
-                    <Building2 className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-semibold text-slate-900">
-                      Company Profile
-                    </h3>
+              <CardHeader icon={<Building2 className="h-5 w-5" />} title="Company Profile" color="blue" />
+              <div className="-mt-6 rounded-b-[28px] border-x border-b border-slate-200 bg-white p-6 shadow-sm">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Input value={companyName} disabled={!canEditSettings} onChange={setCompanyName} placeholder="Company Name" />
+                  <Input value={email} disabled={!canEditSettings} onChange={setEmail} placeholder="Company Email" type="email" />
+                </div>
+              </div>
+
+              <CardHeader icon={<Palette className="h-5 w-5" />} title="Company Branding" color="indigo" />
+              <div className="-mt-6 rounded-b-[28px] border-x border-b border-slate-200 bg-white p-6 shadow-sm">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Input value={logoUrl} disabled={!canEditSettings} onChange={setLogoUrl} placeholder="Logo URL" />
+                  <Input value={supportEmail} disabled={!canEditSettings} onChange={setSupportEmail} placeholder="Support Email" type="email" />
+
+                  <div className="md:col-span-2 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Primary Brand Color
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="color"
+                        value={primaryColor}
+                        disabled={!canEditSettings}
+                        onChange={(e) => setPrimaryColor(e.target.value)}
+                        className="h-12 w-16 cursor-pointer rounded-xl border border-slate-200 bg-white"
+                      />
+                      <input
+                        value={primaryColor}
+                        disabled={!canEditSettings}
+                        onChange={(e) => setPrimaryColor(e.target.value)}
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
+                      />
+                    </div>
+
+                    {logoUrl && (
+                      <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Logo Preview
+                        </p>
+                        <img src={logoUrl} alt="Company logo" className="max-h-20 max-w-full object-contain" />
+                      </div>
+                    )}
                   </div>
                 </div>
+              </div>
 
+              <CardHeader icon={<CreditCard className="h-5 w-5" />} title="Payment Settings" color="emerald" />
+              <div className="-mt-6 rounded-b-[28px] border-x border-b border-slate-200 bg-white p-6 shadow-sm">
                 <div className="grid gap-4 md:grid-cols-2">
-                  <input
-                    type="text"
-                    value={companyName}
+                  <Input value={bankName} disabled={!canEditSettings} onChange={setBankName} placeholder="Bank Name" />
+                  <Input value={bankAccountName} disabled={!canEditSettings} onChange={setBankAccountName} placeholder="Account Name" />
+                  <Input value={bankAccountNumber} disabled={!canEditSettings} onChange={setBankAccountNumber} placeholder="Account Number / Routing / Zelle / CashApp" />
+                  <Input value={String(rentDueDay)} disabled={!canEditSettings} onChange={(v) => setRentDueDay(Number(v))} placeholder="Rent Due Day" type="number" />
+                  <Input value={String(lateFeeAmount)} disabled={!canEditSettings} onChange={(v) => setLateFeeAmount(Number(v))} placeholder="Late Fee Amount" type="number" />
+
+                  <textarea
+                    value={paymentInstructions}
                     disabled={!canEditSettings}
-                    onChange={(e) => setCompanyName(e.target.value)}
-                    placeholder="Company Name"
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 outline-none transition disabled:cursor-not-allowed disabled:opacity-70 focus:border-[#1f3270] focus:bg-white"
-                  />
-                  <input
-                    type="email"
-                    value={email}
-                    disabled={!canEditSettings}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Company Email"
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 outline-none transition disabled:cursor-not-allowed disabled:opacity-70 focus:border-[#1f3270] focus:bg-white"
+                    onChange={(e) => setPaymentInstructions(e.target.value)}
+                    placeholder="Payment Instructions for tenants..."
+                    rows={5}
+                    className="md:col-span-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 outline-none transition disabled:cursor-not-allowed disabled:opacity-70 focus:border-[#1f3270] focus:bg-white"
                   />
                 </div>
               </div>
 
-              <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="mb-6 flex items-center gap-3">
-                  <div className="rounded-2xl bg-purple-100 p-3 text-purple-600">
-                    <Settings className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-semibold text-slate-900">
-                      System Preferences
-                    </h3>
-                  </div>
-                </div>
-
+              <CardHeader icon={<Settings className="h-5 w-5" />} title="System Preferences" color="purple" />
+              <div className="-mt-6 rounded-b-[28px] border-x border-b border-slate-200 bg-white p-6 shadow-sm">
                 <div className="grid gap-4 md:grid-cols-2">
                   <select
                     value={currency}
@@ -776,26 +793,14 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="mb-6 flex items-center gap-3">
-                  <div className="rounded-2xl bg-emerald-100 p-3 text-emerald-600">
-                    <FileCheck className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-semibold text-slate-900">
-                      Document Settings
-                    </h3>
-                  </div>
-                </div>
-
+              <CardHeader icon={<FileCheck className="h-5 w-5" />} title="Document Settings" color="emerald" />
+              <div className="-mt-6 rounded-b-[28px] border-x border-b border-slate-200 bg-white p-6 shadow-sm">
                 <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
                   <input
                     type="checkbox"
                     checked={tenantAccessDefault}
                     disabled={!canEditSettings}
-                    onChange={() =>
-                      setTenantAccessDefault(!tenantAccessDefault)
-                    }
+                    onChange={() => setTenantAccessDefault(!tenantAccessDefault)}
                     className="h-4 w-4"
                   />
                   <span className="text-sm font-medium text-slate-700">
@@ -806,85 +811,20 @@ export default function SettingsPage() {
 
               {isSuperAdmin && (
                 <>
-                  <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-                    <div className="mb-6 flex items-center gap-3">
-                      <div className="rounded-2xl bg-indigo-100 p-3 text-indigo-600">
-                        <UserPlus className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-semibold text-slate-900">
-                          Super Admin — Create Accounts
-                        </h3>
-                        <p className="mt-1 text-sm text-slate-500">
-                          Only the Super Admin can create Admin and Owner
-                          accounts.
-                        </p>
-                      </div>
-                    </div>
-
-                    <form
-                      onSubmit={handleCreateUser}
-                      className="grid gap-4 md:grid-cols-2"
-                    >
-                      <input
-                        type="text"
-                        value={newUserForm.fullName}
-                        onChange={(e) =>
-                          setNewUserForm((prev) => ({
-                            ...prev,
-                            fullName: e.target.value,
-                          }))
-                        }
-                        placeholder="Full Name"
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 outline-none transition focus:border-[#1f3270] focus:bg-white"
-                      />
-
+                  <CardHeader icon={<UserPlus className="h-5 w-5" />} title="Super Admin — Create Accounts" color="indigo" />
+                  <div className="-mt-6 rounded-b-[28px] border-x border-b border-slate-200 bg-white p-6 shadow-sm">
+                    <form onSubmit={handleCreateUser} className="grid gap-4 md:grid-cols-2">
+                      <Input value={newUserForm.fullName} onChange={(v) => setNewUserForm((p) => ({ ...p, fullName: v }))} placeholder="Full Name" />
                       <select
                         value={newUserForm.role}
-                        onChange={(e) =>
-                          setNewUserForm((prev) => ({
-                            ...prev,
-                            role: e.target.value,
-                          }))
-                        }
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 outline-none transition focus:border-[#1f3270] focus:bg-white"
+                        onChange={(e) => setNewUserForm((p) => ({ ...p, role: e.target.value }))}
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 outline-none"
                       >
                         <option value="ADMIN">Admin</option>
                         <option value="OWNER">Owner</option>
                       </select>
-
-                      <div className="relative">
-                        <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                        <input
-                          type="email"
-                          value={newUserForm.email}
-                          onChange={(e) =>
-                            setNewUserForm((prev) => ({
-                              ...prev,
-                              email: e.target.value,
-                            }))
-                          }
-                          placeholder="Email"
-                          className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-4 pl-11 pr-4 text-sm text-slate-700 outline-none transition focus:border-[#1f3270] focus:bg-white"
-                        />
-                      </div>
-
-                      <div className="relative">
-                        <Lock className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                        <input
-                          type="password"
-                          value={newUserForm.password}
-                          onChange={(e) =>
-                            setNewUserForm((prev) => ({
-                              ...prev,
-                              password: e.target.value,
-                            }))
-                          }
-                          placeholder="Password"
-                          className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-4 pl-11 pr-4 text-sm text-slate-700 outline-none transition focus:border-[#1f3270] focus:bg-white"
-                        />
-                      </div>
-
+                      <Input value={newUserForm.email} onChange={(v) => setNewUserForm((p) => ({ ...p, email: v }))} placeholder="Email" type="email" />
+                      <Input value={newUserForm.password} onChange={(v) => setNewUserForm((p) => ({ ...p, password: v }))} placeholder="Password" type="password" />
                       <div className="md:col-span-2">
                         <button
                           type="submit"
@@ -898,32 +838,16 @@ export default function SettingsPage() {
                     </form>
                   </div>
 
-                  <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-                    <div className="mb-6 flex items-center gap-3">
-                      <div className="rounded-2xl bg-sky-100 p-3 text-sky-600">
-                        <UserCog className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-semibold text-slate-900">
-                          User Management
-                        </h3>
-                      </div>
-                    </div>
-
+                  <CardHeader icon={<UserCog className="h-5 w-5" />} title="User Management" color="sky" />
+                  <div className="-mt-6 rounded-b-[28px] border-x border-b border-slate-200 bg-white p-6 shadow-sm">
                     {usersLoading ? (
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
-                        Loading users...
-                      </div>
+                      <EmptyText text="Loading users..." />
                     ) : sortedUsers.length === 0 ? (
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
-                        No users found.
-                      </div>
+                      <EmptyText text="No users found." />
                     ) : (
                       <div className="space-y-3">
                         {sortedUsers.map((account) => {
-                          const accountRole = String(
-                            account.role || ""
-                          ).toUpperCase();
+                          const accountRole = String(account.role || "").toUpperCase();
 
                           const badgeClass =
                             accountRole === "OWNER"
@@ -939,22 +863,14 @@ export default function SettingsPage() {
                             >
                               <div>
                                 <p className="font-semibold text-slate-900">
-                                  {account.fullName ||
-                                    account.name ||
-                                    "Unnamed user"}
+                                  {account.fullName || account.name || "Unnamed user"}
                                 </p>
-                                <p className="text-sm text-slate-500">
-                                  {account.email}
-                                </p>
+                                <p className="text-sm text-slate-500">{account.email}</p>
                               </div>
 
                               <div className="flex items-center gap-3">
-                                <span
-                                  className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${badgeClass}`}
-                                >
-                                  {accountRole === "OWNER"
-                                    ? "SUPER ADMIN"
-                                    : accountRole}
+                                <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${badgeClass}`}>
+                                  {accountRole === "OWNER" ? "SUPER ADMIN" : accountRole}
                                 </span>
                                 <span
                                   className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
@@ -963,9 +879,7 @@ export default function SettingsPage() {
                                       : "bg-emerald-100 text-emerald-700"
                                   }`}
                                 >
-                                  {account.isActive === false
-                                    ? "Inactive"
-                                    : "Active"}
+                                  {account.isActive === false ? "Inactive" : "Active"}
                                 </span>
                               </div>
                             </div>
@@ -984,52 +898,15 @@ export default function SettingsPage() {
                   <div className="rounded-2xl bg-amber-100 p-3 text-amber-600">
                     <Bell className="h-5 w-5" />
                   </div>
-                  <div>
-                    <h3 className="text-xl font-semibold text-slate-900">
-                      Notifications
-                    </h3>
-                  </div>
+                  <h3 className="text-xl font-semibold text-slate-900">
+                    Notifications
+                  </h3>
                 </div>
 
                 <div className="space-y-4">
-                  <label className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                    <span className="text-sm font-medium text-slate-700">
-                      Enable email notifications
-                    </span>
-                    <input
-                      type="checkbox"
-                      checked={notifications}
-                      disabled={!canEditSettings}
-                      onChange={() => setNotifications(!notifications)}
-                      className="h-4 w-4"
-                    />
-                  </label>
-
-                  <label className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                    <span className="text-sm font-medium text-slate-700">
-                      Maintenance alerts
-                    </span>
-                    <input
-                      type="checkbox"
-                      checked={maintenanceAlerts}
-                      disabled={!canEditSettings}
-                      onChange={() => setMaintenanceAlerts(!maintenanceAlerts)}
-                      className="h-4 w-4"
-                    />
-                  </label>
-
-                  <label className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                    <span className="text-sm font-medium text-slate-700">
-                      Lease reminders
-                    </span>
-                    <input
-                      type="checkbox"
-                      checked={leaseReminders}
-                      disabled={!canEditSettings}
-                      onChange={() => setLeaseReminders(!leaseReminders)}
-                      className="h-4 w-4"
-                    />
-                  </label>
+                  <Toggle label="Enable email notifications" checked={notifications} disabled={!canEditSettings} onChange={() => setNotifications(!notifications)} />
+                  <Toggle label="Maintenance alerts" checked={maintenanceAlerts} disabled={!canEditSettings} onChange={() => setMaintenanceAlerts(!maintenanceAlerts)} />
+                  <Toggle label="Lease reminders" checked={leaseReminders} disabled={!canEditSettings} onChange={() => setLeaseReminders(!leaseReminders)} />
                 </div>
               </div>
 
@@ -1038,71 +915,34 @@ export default function SettingsPage() {
                   <div className="rounded-2xl bg-red-100 p-3 text-red-600">
                     <Shield className="h-5 w-5" />
                   </div>
-                  <div>
-                    <h3 className="text-xl font-semibold text-slate-900">
-                      Security
-                    </h3>
-                  </div>
+                  <h3 className="text-xl font-semibold text-slate-900">
+                    Security
+                  </h3>
                 </div>
 
                 <form onSubmit={handleChangePassword} className="space-y-4">
-  <input
-    type="password"
-    value={passwordForm.currentPassword}
-    onChange={(e) =>
-      setPasswordForm((prev) => ({
-        ...prev,
-        currentPassword: e.target.value,
-      }))
-    }
-    placeholder="Current password"
-    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 outline-none transition focus:border-[#1f3270] focus:bg-white"
-  />
+                  <Input value={passwordForm.currentPassword} onChange={(v) => setPasswordForm((p) => ({ ...p, currentPassword: v }))} placeholder="Current password" type="password" />
+                  <Input value={passwordForm.newPassword} onChange={(v) => setPasswordForm((p) => ({ ...p, newPassword: v }))} placeholder="New password" type="password" />
+                  <Input value={passwordForm.confirmPassword} onChange={(v) => setPasswordForm((p) => ({ ...p, confirmPassword: v }))} placeholder="Confirm new password" type="password" />
 
-  <input
-    type="password"
-    value={passwordForm.newPassword}
-    onChange={(e) =>
-      setPasswordForm((prev) => ({
-        ...prev,
-        newPassword: e.target.value,
-      }))
-    }
-    placeholder="New password"
-    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 outline-none transition focus:border-[#1f3270] focus:bg-white"
-  />
-
-  <input
-    type="password"
-    value={passwordForm.confirmPassword}
-    onChange={(e) =>
-      setPasswordForm((prev) => ({
-        ...prev,
-        confirmPassword: e.target.value,
-      }))
-    }
-    placeholder="Confirm new password"
-    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 outline-none transition focus:border-[#1f3270] focus:bg-white"
-  />
-
-  <button
-    type="submit"
-    disabled={changingPassword}
-    className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-red-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
-  >
-    {changingPassword ? (
-      <>
-        <Loader2 className="h-4 w-4 animate-spin" />
-        Updating...
-      </>
-    ) : (
-      <>
-        <Lock className="h-4 w-4" />
-        Change Password
-      </>
-    )}
-  </button>
-</form>
+                  <button
+                    type="submit"
+                    disabled={changingPassword}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-red-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {changingPassword ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Updating...
+                      </>
+                    ) : (
+                      <>
+                        <Lock className="h-4 w-4" />
+                        Change Password
+                      </>
+                    )}
+                  </button>
+                </form>
               </div>
 
               <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
@@ -1110,28 +950,110 @@ export default function SettingsPage() {
                   <div className="rounded-2xl bg-green-100 p-3 text-green-600">
                     <Database className="h-5 w-5" />
                   </div>
-                  <div>
-                    <h3 className="text-xl font-semibold text-slate-900">
-                      System Info
-                    </h3>
-                  </div>
+                  <h3 className="text-xl font-semibold text-slate-900">
+                    System Info
+                  </h3>
                 </div>
 
                 <div className="space-y-4">
                   <StatusRow label="API Server" value="Online" color="green" />
                   <StatusRow label="Database" value="Connected" color="green" />
                   <StatusRow label="Version" value="v1.0" color="blue" />
-                  <StatusRow
-                    label="Environment"
-                    value="Production"
-                    color="amber"
-                  />
+                  <StatusRow label="Environment" value="Production" color="amber" />
                 </div>
               </div>
             </div>
           </div>
         </div>
       </main>
+    </div>
+  );
+}
+
+function Input({
+  value,
+  onChange,
+  placeholder,
+  type = "text",
+  disabled = false,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  type?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <input
+      type={type}
+      value={value}
+      disabled={disabled}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 outline-none transition disabled:cursor-not-allowed disabled:opacity-70 focus:border-[#1f3270] focus:bg-white"
+    />
+  );
+}
+
+function Toggle({
+  label,
+  checked,
+  onChange,
+  disabled,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <label className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+      <span className="text-sm font-medium text-slate-700">{label}</span>
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        onChange={onChange}
+        className="h-4 w-4"
+      />
+    </label>
+  );
+}
+
+function EmptyText({ text }: { text: string }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+      {text}
+    </div>
+  );
+}
+
+function CardHeader({
+  icon,
+  title,
+  color,
+}: {
+  icon: ReactNode;
+  title: string;
+  color: "blue" | "purple" | "emerald" | "indigo" | "sky";
+}) {
+  const colorClasses =
+    color === "blue"
+      ? "bg-blue-100 text-blue-600"
+      : color === "purple"
+      ? "bg-purple-100 text-purple-600"
+      : color === "emerald"
+      ? "bg-emerald-100 text-emerald-600"
+      : color === "sky"
+      ? "bg-sky-100 text-sky-600"
+      : "bg-indigo-100 text-indigo-600";
+
+  return (
+    <div className="rounded-t-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="flex items-center gap-3">
+        <div className={`rounded-2xl p-3 ${colorClasses}`}>{icon}</div>
+        <h3 className="text-xl font-semibold text-slate-900">{title}</h3>
+      </div>
     </div>
   );
 }
