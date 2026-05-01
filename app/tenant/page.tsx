@@ -279,9 +279,20 @@ export default function TenantPortalPage() {
       }
 
       const [paymentsRes, maintenanceRes, documentsRes] = await Promise.all([
-        fetch(`${API_URL}/payments`, { cache: "no-store" }),
-        fetch(`${API_URL}/api/maintenance`, { cache: "no-store" }),
-        fetch(`${API_URL}/documents`, { cache: "no-store" }),
+        fetch(`${API_URL}/api/payments/tenant-history`, {
+          cache: "no-store",
+          headers: {
+            Authorization: `Bearer ${token || ""}`,
+          },
+        }),
+        fetch(`${API_URL}/api/maintenance`, {
+          cache: "no-store",
+          headers: { Authorization: `Bearer ${token || ""}` },
+        }),
+        fetch(`${API_URL}/api/documents`, {
+          cache: "no-store",
+          headers: { Authorization: `Bearer ${token || ""}` },
+        }),
       ]);
 
       const paymentsData = await paymentsRes.json().catch(() => []);
@@ -336,8 +347,11 @@ export default function TenantPortalPage() {
   const monthlyRent =
     currentLease?.rentAmount ?? user?.tenant?.unit?.monthlyRent ?? 0;
 
-  const paidPayments = useMemo(
-    () => payments.filter((p) => p.status === "PAID").length,
+  const paidAmount = useMemo(
+    () =>
+      payments
+        .filter((p) => String(p.status || "").toUpperCase() === "PAID")
+        .reduce((sum, p) => sum + Number(p.amount || 0), 0),
     [payments]
   );
 
@@ -480,12 +494,12 @@ export default function TenantPortalPage() {
                 accent="blue"
               />
               <KpiCard
-                title="Paid Payments"
-                value={String(paidPayments)}
-                subtitle="Successful rent records"
-                icon={<BadgeCheck className="h-5 w-5" />}
-                accent="emerald"
-              />
+                  title="Paid Amount"
+                  value={formatMoney(paidAmount)}
+                  subtitle="Approved rent payments"
+                  icon={<BadgeCheck className="h-5 w-5" />}
+                  accent="emerald"
+                />
               <KpiCard
                 title="Open Requests"
                 value={String(pendingMaintenance)}
