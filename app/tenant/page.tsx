@@ -27,6 +27,8 @@ import {
   ShieldCheck,
   DoorOpen,
   Layers3,
+  Menu,
+  X,
 } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
@@ -190,6 +192,8 @@ function getMaintenanceBadge(status?: string | null) {
   }
 }
 
+
+
 export default function TenantPortalPage() {
   const router = useRouter();
 
@@ -200,6 +204,9 @@ export default function TenantPortalPage() {
   const [maintenance, setMaintenance] = useState<MaintenanceItem[]>([]);
   const [documents, setDocuments] = useState<TenantDocument[]>([]);
   const [error, setError] = useState("");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -347,13 +354,52 @@ export default function TenantPortalPage() {
   const monthlyRent =
     currentLease?.rentAmount ?? user?.tenant?.unit?.monthlyRent ?? 0;
 
-  const paidAmount = useMemo(
-    () =>
-      payments
-        .filter((p) => String(p.status || "").toUpperCase() === "PAID")
-        .reduce((sum, p) => sum + Number(p.amount || 0), 0),
-    [payments]
-  );
+
+
+
+  const leaseStatus = String(
+  user?.tenant?.leaseStatus || currentLease?.status || ""
+).toUpperCase();
+
+const leaseEndDate = currentLease?.endDate || user?.tenant?.leaseEndDate || null;
+
+const isLeaseEnded =
+  ["EXPIRED", "TERMINATED", "CANCELLED", "INACTIVE"].includes(leaseStatus) ||
+  (leaseEndDate ? new Date(leaseEndDate) < new Date() : false);
+
+const activeMonthlyRent = isLeaseEnded ? 0 : Number(monthlyRent || 0);
+
+const currentMonthPaidAmount = useMemo(() => {
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+
+  return payments
+    .filter((p) => {
+      const status = String(p.status || "").toUpperCase();
+      const paymentDate = new Date(p.paymentDate);
+
+      return (
+        status === "PAID" &&
+        paymentDate.getMonth() === currentMonth &&
+        paymentDate.getFullYear() === currentYear
+      );
+    })
+    .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+}, [payments]);
+
+const remainingBalance = Math.max(
+  activeMonthlyRent - Number(currentMonthPaidAmount || 0),
+  0
+);
+
+
+
+
+
+
+
+
 
   const pendingMaintenance = useMemo(
     () =>
@@ -396,7 +442,78 @@ export default function TenantPortalPage() {
   return (
     <div className="min-h-screen bg-[#f4f7fb] text-slate-900">
       <div className="flex min-h-screen">
-        <aside className="hidden w-80 shrink-0 flex-col justify-between bg-gradient-to-b from-[#102a67] via-[#173d8e] to-[#0f1f45] text-white shadow-2xl lg:flex">
+        {mobileMenuOpen && (
+  <div className="fixed inset-0 z-50 lg:hidden">
+    <div
+      className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+      onClick={() => setMobileMenuOpen(false)}
+    />
+
+    <aside className="absolute left-0 top-0 flex h-full w-80 max-w-[85vw] flex-col justify-between bg-gradient-to-b from-[#102a67] via-[#173d8e] to-[#0f1f45] text-white shadow-2xl">
+      <div>
+        <div className="flex items-center justify-between border-b border-white/10 px-6 py-6">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">The House Hub</h1>
+            <p className="mt-1 text-sm text-blue-100/70">
+              Premium Tenant Workspace
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(false)}
+            className="rounded-2xl bg-white/10 p-2 text-white hover:bg-white/20"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="px-5 py-5">
+          <div className="rounded-3xl border border-white/10 bg-white/10 p-5 backdrop-blur">
+            <div className="flex items-center gap-4">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/15 text-lg font-bold text-white">
+                {initials}
+              </div>
+              <div>
+                <p className="text-base font-semibold">{fullName}</p>
+                <p className="text-sm text-blue-100/70">
+                  {user?.email || user?.tenant?.email || "Tenant"}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <nav className="px-4 pb-6">
+          <p className="mb-3 px-3 text-xs font-semibold uppercase tracking-widest text-blue-200/50">
+            Tenant Menu
+          </p>
+
+          <div className="space-y-2" onClick={() => setMobileMenuOpen(false)}>
+            <SidebarItem label="Overview" icon={<Home size={18} />} active href="/tenant" />
+            <SidebarItem label="Payments" icon={<CreditCard size={18} />} href="/tenant/payments" />
+            <SidebarItem label="Maintenance" icon={<Wrench size={18} />} href="/tenant/maintenance" />
+            <SidebarItem label="Documents" icon={<FileText size={18} />} href="/tenant/documents" />
+            <TenantNav label="Contact Landlord" href="/tenant/contact" icon={<MessageCircle size={18} />} />
+            <SidebarItem label="Notifications" icon={<Bell size={18} />} href="/tenant/notifications" />
+            <TenantNav label="Settings" href="/tenant/settings" icon={<Settings size={18} />} />
+          </div>
+        </nav>
+      </div>
+
+      <div className="border-t border-white/10 px-6 py-6">
+        <button
+          onClick={handleLogout}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-red-200/20 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-100 transition hover:bg-red-500/20"
+        >
+          <LogOut size={16} />
+          Logout
+        </button>
+      </div>
+    </aside>
+  </div>
+)}
+        <aside className="fixed inset-y-0 left-0 z-40 hidden w-80 shrink-0 flex-col justify-between bg-gradient-to-b from-[#102a67] via-[#173d8e] to-[#0f1f45] text-white shadow-2xl lg:flex">
           <div>
             <div className="border-b border-white/10 px-8 py-8">
               <h1 className="text-3xl font-bold tracking-tight">The House Hub</h1>
@@ -449,7 +566,22 @@ export default function TenantPortalPage() {
           </div>
         </aside>
 
-        <main className="flex-1">
+        <main className="min-h-screen flex-1 lg:ml-80">
+
+          <div className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-200 bg-white/90 px-4 py-4 backdrop-blur lg:hidden">
+  <div>
+    <p className="text-sm font-semibold text-slate-900">The House Hub</p>
+    <p className="text-xs text-slate-500">Tenant Workspace</p>
+  </div>
+
+  <button
+    type="button"
+    onClick={() => setMobileMenuOpen(true)}
+    className="rounded-2xl border border-slate-200 bg-white p-3 text-slate-700 shadow-sm"
+  >
+    <Menu className="h-5 w-5" />
+  </button>
+</div>
           <div className="border-b border-slate-200 bg-white/80 px-6 py-6 backdrop-blur md:px-8">
             <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
               <div>
@@ -488,18 +620,25 @@ export default function TenantPortalPage() {
             <section className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
               <KpiCard
                 title="Monthly Rent"
-                value={formatMoney(monthlyRent)}
+                value={formatMoney(activeMonthlyRent)}
                 subtitle="Current rental amount"
                 icon={<Wallet className="h-5 w-5" />}
                 accent="blue"
               />
               <KpiCard
                   title="Paid Amount"
-                  value={formatMoney(paidAmount)}
+                  value={formatMoney(currentMonthPaidAmount)}
                   subtitle="Approved rent payments"
                   icon={<BadgeCheck className="h-5 w-5" />}
                   accent="emerald"
                 />
+              <KpiCard
+  title="Remaining Balance"
+  value={formatMoney(remainingBalance)}
+  subtitle="Amount left to pay"
+  icon={<Wallet className="h-5 w-5" />}
+  accent="amber"
+/>
               <KpiCard
                 title="Open Requests"
                 value={String(pendingMaintenance)}
