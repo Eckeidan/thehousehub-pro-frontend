@@ -174,14 +174,20 @@ function generatePropertyCode(
 ) {
   const prefix = getPropertyTypePrefix(propertyType);
   const cityCode = sanitizeCityForCode(city || "CITY");
-  const matchingCount = properties.filter(
-    (p) =>
-      p.propertyType === propertyType &&
-      (p.city || "").trim().toLowerCase() === city.trim().toLowerCase()
-  ).length;
+  const baseCode = `${prefix}-${cityCode}`;
 
-  const nextNumber = String(matchingCount + 1).padStart(3, "0");
-  return `${prefix}-${cityCode}-${nextNumber}`;
+  const existingNumbers = properties
+    .filter((p) => String(p.code || "").startsWith(baseCode))
+    .map((p) => {
+      const match = String(p.code || "").match(/-(\d+)$/);
+      return match ? Number(match[1]) : 0;
+    })
+    .filter((n) => Number.isFinite(n));
+
+  const nextNumber =
+    existingNumbers.length > 0 ? Math.max(...existingNumbers) + 1 : 1;
+
+  return `${baseCode}-${String(nextNumber).padStart(3, "0")}`;
 }
 
 export default function PropertiesPage() {
