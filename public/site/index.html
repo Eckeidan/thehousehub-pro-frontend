@@ -1,0 +1,1362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TheHouseHub — Stop Chasing Tenants. Start Living Your Life.</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --navy:      #3B5CC4;
+      --navy-dark: #2A4BAA;
+      --navy-deeper:#1E3A8A;
+      --teal:      #45C9B5;
+      --teal-dark: #30B09C;
+      --purple:    #3B5CC4;
+      --grad:      linear-gradient(135deg, #3B5CC4 0%, #45C9B5 100%);
+      --grad-h:    linear-gradient(135deg, #2A4BAA 0%, #30B09C 100%);
+      --bg-light:  #F0F4FF;
+      --bg-white:  #FFFFFF;
+      --text-dark: #0F1F4A;
+      --text-mid:  #3D5080;
+      --text-light:#6B7CAA;
+      --border:    #D8E2F8;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      color: var(--text-dark);
+      background: var(--bg-white);
+      overflow-x: hidden;
+    }
+
+    /* ─── UTILITIES ─── */
+    .grad-text {
+      background: var(--grad);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .btn-primary {
+      display: inline-block;
+      background: var(--grad);
+      color: #fff;
+      font-weight: 700;
+      font-size: 1rem;
+      padding: 0.85rem 2rem;
+      border-radius: 50px;
+      text-decoration: none;
+      transition: opacity .2s, transform .2s, box-shadow .2s;
+      box-shadow: 0 4px 20px rgba(91,106,212,0.35);
+      border: none;
+      cursor: pointer;
+    }
+    .btn-primary:hover {
+      opacity: .9;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 28px rgba(91,106,212,0.45);
+    }
+    .btn-outline {
+      display: inline-block;
+      background: transparent;
+      color: var(--navy);
+      font-weight: 600;
+      font-size: 1rem;
+      padding: 0.85rem 2rem;
+      border-radius: 50px;
+      text-decoration: none;
+      border: 2px solid var(--border);
+      transition: border-color .2s, color .2s, transform .2s;
+      cursor: pointer;
+    }
+    .btn-outline:hover {
+      border-color: var(--purple);
+      color: var(--purple);
+      transform: translateY(-2px);
+    }
+    .section-label {
+      display: inline-block;
+      background: linear-gradient(135deg, rgba(91,106,212,.12), rgba(69,201,181,.12));
+      color: var(--purple);
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 0.4rem 1rem;
+      border-radius: 50px;
+      margin-bottom: 1rem;
+    }
+    .container {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+    }
+
+    /* ─── NAV ─── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      background: rgba(255,255,255,0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 1.5rem;
+    }
+    .nav-inner {
+      max-width: 1120px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 68px;
+    }
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      text-decoration: none;
+    }
+    .nav-logo img {
+      display: block;
+    }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+      list-style: none;
+    }
+    .nav-links a {
+      color: var(--text-mid);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: color .2s;
+    }
+    .nav-links a:hover { color: var(--navy); }
+    .nav-cta { display: flex; align-items: center; gap: 1rem; }
+    .nav-cta .btn-primary { padding: 0.6rem 1.4rem; font-size: 0.875rem; }
+
+    /* ─── HERO ─── */
+    .hero {
+      background: var(--navy);
+      padding: 8rem 1.5rem 5rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -200px; right: -200px;
+      width: 700px; height: 700px;
+      background: radial-gradient(circle, rgba(69,201,181,.22) 0%, transparent 65%);
+      pointer-events: none;
+    }
+    .hero::after {
+      content: '';
+      position: absolute;
+      bottom: -150px; left: -100px;
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, rgba(255,255,255,.08) 0%, transparent 65%);
+      pointer-events: none;
+    }
+    .hero-inner {
+      max-width: 1120px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4rem;
+      align-items: center;
+      position: relative;
+      z-index: 1;
+    }
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(69,201,181,.15);
+      border: 1px solid rgba(69,201,181,.3);
+      color: var(--teal);
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 0.4rem 1rem;
+      border-radius: 50px;
+      margin-bottom: 1.5rem;
+    }
+    .hero-badge::before {
+      content: '●';
+      font-size: 0.5rem;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+    .hero h1 {
+      font-size: clamp(2.2rem, 4vw, 3.4rem);
+      font-weight: 900;
+      color: #fff;
+      line-height: 1.12;
+      margin-bottom: 1.5rem;
+    }
+    .hero h1 em {
+      font-style: normal;
+      background: var(--grad);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero-sub {
+      color: rgba(255,255,255,0.7);
+      font-size: 1.1rem;
+      line-height: 1.7;
+      margin-bottom: 2.5rem;
+      max-width: 480px;
+    }
+    .hero-actions {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .hero-actions .btn-outline {
+      color: rgba(255,255,255,0.8);
+      border-color: rgba(255,255,255,0.25);
+    }
+    .hero-actions .btn-outline:hover {
+      color: #fff;
+      border-color: var(--teal);
+    }
+    .hero-trust {
+      margin-top: 2.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      color: rgba(255,255,255,0.5);
+      font-size: 0.82rem;
+    }
+    .hero-trust .avatars {
+      display: flex;
+    }
+    .hero-trust .avatars span {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      border: 2px solid var(--navy-dark);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+      margin-left: -8px;
+      color: #fff;
+    }
+    .hero-trust .avatars span:first-child { margin-left: 0; }
+    .a1 { background: linear-gradient(135deg, #667eea, #764ba2); }
+    .a2 { background: linear-gradient(135deg, #f093fb, #f5576c); }
+    .a3 { background: linear-gradient(135deg, #4facfe, #00f2fe); }
+    .a4 { background: linear-gradient(135deg, #43e97b, #38f9d7); }
+
+    /* App Mockup */
+    .hero-visual {
+      position: relative;
+    }
+    .app-mockup {
+      background: #fff;
+      border-radius: 20px;
+      box-shadow: 0 30px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.08);
+      overflow: hidden;
+      transform: perspective(1000px) rotateY(-5deg) rotateX(2deg);
+      transition: transform .4s;
+    }
+    .app-mockup:hover {
+      transform: perspective(1000px) rotateY(-2deg) rotateX(1deg);
+    }
+    .mockup-bar {
+      background: var(--navy-deeper);
+      padding: 0.85rem 1.2rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .mockup-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .d-red { background: #ff5f57; }
+    .d-yellow { background: #febc2e; }
+    .d-green { background: #28c840; }
+    .mockup-title { color: rgba(255,255,255,0.6); font-size: 0.78rem; margin-left: auto; margin-right: auto; }
+    .mockup-body { padding: 1.2rem; background: var(--bg-light); }
+
+    /* Dashboard Cards */
+    .dash-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    .dash-greeting { font-size: 0.85rem; font-weight: 700; color: var(--navy); }
+    .dash-date { font-size: 0.7rem; color: var(--text-light); }
+    .dash-cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.6rem;
+      margin-bottom: 0.8rem;
+    }
+    .dash-card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 0.7rem;
+      border: 1px solid var(--border);
+    }
+    .dash-card-label { font-size: 0.65rem; color: var(--text-light); margin-bottom: 0.2rem; }
+    .dash-card-val { font-size: 1.1rem; font-weight: 800; color: var(--navy); }
+    .dash-card-val.teal { color: var(--teal-dark); }
+    .dash-card-sub { font-size: 0.6rem; color: var(--teal-dark); font-weight: 600; }
+
+    .msg-list { display: flex; flex-direction: column; gap: 0.5rem; }
+    .msg-item {
+      background: #fff;
+      border-radius: 10px;
+      padding: 0.65rem 0.8rem;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      border: 1px solid var(--border);
+    }
+    .msg-item.resolved { opacity: 0.55; }
+    .msg-avatar {
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .msg-content { flex: 1; min-width: 0; }
+    .msg-name { font-size: 0.7rem; font-weight: 700; color: var(--navy); }
+    .msg-text { font-size: 0.63rem; color: var(--text-light); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .msg-badge {
+      font-size: 0.58rem;
+      font-weight: 700;
+      padding: 0.15rem 0.45rem;
+      border-radius: 50px;
+      flex-shrink: 0;
+    }
+    .badge-auto { background: rgba(69,201,181,.15); color: var(--teal-dark); }
+    .badge-new { background: rgba(91,106,212,.15); color: var(--purple); }
+    .badge-done { background: rgba(0,0,0,.06); color: var(--text-light); }
+
+    /* ─── PAIN SECTION ─── */
+    .pain {
+      background: var(--bg-light);
+      padding: 5rem 1.5rem;
+    }
+    .pain-inner {
+      max-width: 1120px;
+      margin: 0 auto;
+    }
+    .pain-header { text-align: center; margin-bottom: 3rem; }
+    .pain-header h2 {
+      font-size: clamp(1.8rem, 3vw, 2.8rem);
+      font-weight: 900;
+      color: var(--navy-dark);
+      margin-bottom: 0.75rem;
+    }
+    .pain-header p {
+      color: var(--text-mid);
+      font-size: 1.05rem;
+      max-width: 560px;
+      margin: 0 auto;
+      line-height: 1.7;
+    }
+    .pain-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+    }
+    .pain-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.75rem;
+      position: relative;
+      overflow: hidden;
+      transition: box-shadow .2s, transform .2s;
+    }
+    .pain-card:hover {
+      box-shadow: 0 12px 40px rgba(43,53,119,.1);
+      transform: translateY(-3px);
+    }
+    .pain-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: var(--grad);
+      opacity: 0;
+      transition: opacity .2s;
+    }
+    .pain-card:hover::before { opacity: 1; }
+    .pain-emoji { font-size: 2rem; margin-bottom: 1rem; }
+    .pain-card h3 { font-size: 1rem; font-weight: 700; color: var(--navy); margin-bottom: 0.5rem; }
+    .pain-card p { font-size: 0.9rem; color: var(--text-mid); line-height: 1.6; }
+
+    /* ─── FOUNDER STRIP ─── */
+    .founder-strip {
+      background: var(--navy);
+      padding: 3.5rem 1.5rem;
+    }
+    .founder-strip-inner {
+      max-width: 780px;
+      margin: 0 auto;
+      display: flex;
+      align-items: flex-start;
+      gap: 2rem;
+    }
+    .founder-quote-mark {
+      font-size: 5rem;
+      line-height: 1;
+      color: var(--teal);
+      opacity: 0.5;
+      font-family: Georgia, serif;
+      flex-shrink: 0;
+      margin-top: -0.75rem;
+    }
+    .founder-body {}
+    .founder-text {
+      font-size: 1.15rem;
+      color: rgba(255,255,255,0.9);
+      line-height: 1.75;
+      font-style: italic;
+      margin-bottom: 1.25rem;
+    }
+    .founder-byline {
+      font-size: 0.88rem;
+      color: var(--teal);
+      font-weight: 600;
+      font-style: normal;
+    }
+    @media (max-width: 600px) {
+      .founder-strip-inner { flex-direction: column; gap: 0.5rem; }
+      .founder-quote-mark { font-size: 3rem; }
+      .founder-text { font-size: 1rem; }
+    }
+
+    /* ─── SOLUTION ─── */
+    .solution {
+      padding: 5.5rem 1.5rem;
+      background: var(--bg-white);
+    }
+    .solution-inner {
+      max-width: 1120px;
+      margin: 0 auto;
+    }
+    .solution-header { text-align: center; margin-bottom: 4rem; }
+    .solution-header h2 {
+      font-size: clamp(1.8rem, 3vw, 2.8rem);
+      font-weight: 900;
+      color: var(--navy-dark);
+      margin-bottom: 0.75rem;
+    }
+    .solution-header p {
+      color: var(--text-mid);
+      font-size: 1.05rem;
+      max-width: 560px;
+      margin: 0 auto;
+      line-height: 1.7;
+    }
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 2rem;
+    }
+    .feature-card {
+      display: flex;
+      gap: 1.25rem;
+      align-items: flex-start;
+      padding: 1.75rem;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background: var(--bg-white);
+      transition: box-shadow .2s, transform .2s;
+    }
+    .feature-card:hover {
+      box-shadow: 0 12px 40px rgba(43,53,119,.08);
+      transform: translateY(-3px);
+    }
+    .feature-icon {
+      width: 52px; height: 52px;
+      border-radius: 14px;
+      background: var(--grad);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 1.4rem;
+    }
+    .feature-text h3 { font-size: 1.05rem; font-weight: 700; color: var(--navy); margin-bottom: 0.45rem; }
+    .feature-text p { font-size: 0.9rem; color: var(--text-mid); line-height: 1.65; }
+
+    /* ─── HOW IT WORKS ─── */
+    .how {
+      background: var(--navy);
+      padding: 5.5rem 1.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .how::before {
+      content: '';
+      position: absolute;
+      top: -100px; right: -100px;
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, rgba(69,201,181,.18) 0%, transparent 65%);
+      pointer-events: none;
+    }
+    .how-inner {
+      max-width: 1120px;
+      margin: 0 auto;
+      position: relative;
+      z-index: 1;
+    }
+    .how-header { text-align: center; margin-bottom: 4rem; }
+    .how-header h2 {
+      font-size: clamp(1.8rem, 3vw, 2.8rem);
+      font-weight: 900;
+      color: #fff;
+      margin-bottom: 0.75rem;
+    }
+    .how-header p { color: rgba(255,255,255,.65); font-size: 1.05rem; max-width: 520px; margin: 0 auto; line-height: 1.7; }
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2rem;
+      position: relative;
+    }
+    .steps::before {
+      content: '';
+      position: absolute;
+      top: 38px;
+      left: calc(16.66% + 26px);
+      right: calc(16.66% + 26px);
+      height: 2px;
+      background: linear-gradient(90deg, rgba(69,201,181,.4), rgba(91,106,212,.4));
+    }
+    .step { text-align: center; }
+    .step-num {
+      width: 52px; height: 52px;
+      border-radius: 50%;
+      background: var(--grad);
+      color: #fff;
+      font-size: 1.1rem;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1.25rem;
+      box-shadow: 0 0 0 6px rgba(91,106,212,.2);
+    }
+    .step h3 { font-size: 1rem; font-weight: 700; color: #fff; margin-bottom: 0.5rem; }
+    .step p { font-size: 0.88rem; color: rgba(255,255,255,.6); line-height: 1.65; }
+
+    /* ─── TESTIMONIALS ─── */
+    .testimonials {
+      background: var(--bg-light);
+      padding: 5.5rem 1.5rem;
+    }
+    .testimonials-inner {
+      max-width: 1120px;
+      margin: 0 auto;
+    }
+    .testimonials-header { text-align: center; margin-bottom: 3rem; }
+    .testimonials-header h2 {
+      font-size: clamp(1.8rem, 3vw, 2.6rem);
+      font-weight: 900;
+      color: var(--navy-dark);
+      margin-bottom: 0.75rem;
+    }
+    .testimonials-header p { color: var(--text-mid); font-size: 1rem; }
+    .testi-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+    }
+    .testi-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.75rem;
+      display: flex;
+      flex-direction: column;
+      transition: box-shadow .2s, transform .2s;
+    }
+    .testi-card:hover {
+      box-shadow: 0 12px 40px rgba(43,53,119,.1);
+      transform: translateY(-3px);
+    }
+    .testi-stars { color: #F59E0B; font-size: 0.95rem; margin-bottom: 1rem; letter-spacing: 2px; }
+    .testi-quote { font-size: 0.95rem; color: var(--text-dark); line-height: 1.7; margin-bottom: 1.5rem; flex: 1; font-style: italic; }
+    .testi-author { display: flex; align-items: center; gap: 0.75rem; }
+    .testi-av {
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.85rem; font-weight: 700; color: #fff;
+    }
+    .testi-name { font-size: 0.88rem; font-weight: 700; color: var(--navy); }
+    .testi-role { font-size: 0.75rem; color: var(--text-light); }
+
+    /* ─── STATS BAR ─── */
+    .stats {
+      background: var(--bg-white);
+      padding: 3.5rem 1.5rem;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .stats-inner {
+      max-width: 1120px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 2rem;
+      text-align: center;
+    }
+    .stat-num {
+      font-size: clamp(1.8rem, 3vw, 2.4rem);
+      font-weight: 900;
+      background: var(--grad);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 0.25rem;
+    }
+    .stat-label { font-size: 0.88rem; color: var(--text-mid); font-weight: 500; }
+
+    /* ─── FINAL CTA ─── */
+    .cta-section {
+      padding: 6rem 1.5rem;
+      background: var(--bg-white);
+    }
+    .cta-box {
+      max-width: 780px;
+      margin: 0 auto;
+      background: var(--navy);
+      border-radius: 24px;
+      padding: 4rem 3rem;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .cta-box::before {
+      content: '';
+      position: absolute;
+      top: -100px; right: -80px;
+      width: 300px; height: 300px;
+      background: radial-gradient(circle, rgba(69,201,181,.2) 0%, transparent 65%);
+      pointer-events: none;
+    }
+    .cta-box::after {
+      content: '';
+      position: absolute;
+      bottom: -80px; left: -80px;
+      width: 280px; height: 280px;
+      background: radial-gradient(circle, rgba(91,106,212,.2) 0%, transparent 65%);
+      pointer-events: none;
+    }
+    .cta-box h2 {
+      font-size: clamp(1.8rem, 3vw, 2.4rem);
+      font-weight: 900;
+      color: #fff;
+      margin-bottom: 1rem;
+      position: relative;
+      z-index: 1;
+    }
+    .cta-box p {
+      color: rgba(255,255,255,.7);
+      font-size: 1.05rem;
+      line-height: 1.7;
+      margin-bottom: 2.5rem;
+      max-width: 520px;
+      margin-left: auto;
+      margin-right: auto;
+      position: relative;
+      z-index: 1;
+    }
+    .cta-actions {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      position: relative;
+      z-index: 1;
+    }
+    .cta-actions .btn-outline {
+      color: rgba(255,255,255,.75);
+      border-color: rgba(255,255,255,.25);
+    }
+    .cta-actions .btn-outline:hover {
+      color: #fff;
+      border-color: var(--teal);
+    }
+    .cta-note {
+      margin-top: 1.25rem;
+      font-size: 0.8rem;
+      color: rgba(255,255,255,.4);
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ─── FOOTER ─── */
+    footer {
+      background: var(--navy-deeper);
+      padding: 3rem 1.5rem;
+    }
+    .footer-inner {
+      max-width: 1120px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+    }
+    .footer-brand img { opacity: 0.9; }
+    .footer-copy { color: rgba(255,255,255,.3); font-size: 0.8rem; }
+    .footer-links {
+      display: flex;
+      gap: 1.5rem;
+    }
+    .footer-links a {
+      color: rgba(255,255,255,.4);
+      text-decoration: none;
+      font-size: 0.82rem;
+      transition: color .2s;
+      cursor: pointer;
+    }
+    .footer-links a:hover { color: var(--teal); }
+
+    /* ─── CONTACT MODAL ─── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(10,20,60,0.7);
+      backdrop-filter: blur(6px);
+      z-index: 500;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: #fff;
+      border-radius: 20px;
+      padding: 2.5rem;
+      width: 100%;
+      max-width: 480px;
+      position: relative;
+      box-shadow: 0 30px 80px rgba(0,0,0,0.25);
+      animation: modalIn .25s ease;
+    }
+    @keyframes modalIn {
+      from { opacity: 0; transform: translateY(20px) scale(0.97); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .modal-close {
+      position: absolute;
+      top: 1.1rem; right: 1.1rem;
+      background: var(--bg-light);
+      border: none;
+      border-radius: 50%;
+      width: 32px; height: 32px;
+      font-size: 1rem;
+      color: var(--text-light);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background .2s;
+    }
+    .modal-close:hover { background: var(--border); }
+    .modal-box h2 { font-size: 1.4rem; font-weight: 800; color: var(--navy); margin-bottom: 0.4rem; }
+    .modal-box p { font-size: 0.9rem; color: var(--text-mid); margin-bottom: 1.5rem; }
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display: block; font-size: 0.82rem; font-weight: 600; color: var(--text-dark); margin-bottom: 0.35rem; }
+    .form-group input,
+    .form-group textarea,
+    .form-group select {
+      width: 100%;
+      padding: 0.7rem 0.9rem;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.9rem;
+      color: var(--text-dark);
+      background: var(--bg-white);
+      transition: border-color .2s, box-shadow .2s;
+      outline: none;
+    }
+    .form-group input:focus,
+    .form-group textarea:focus,
+    .form-group select:focus {
+      border-color: var(--navy);
+      box-shadow: 0 0 0 3px rgba(59,92,196,0.1);
+    }
+    .form-group textarea { resize: vertical; min-height: 110px; }
+    .form-submit { width: 100%; margin-top: 0.5rem; font-size: 1rem; padding: 0.9rem; }
+    .form-success {
+      display: none;
+      text-align: center;
+      padding: 1.5rem 0;
+    }
+    .form-success .success-icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
+    .form-success h3 { font-size: 1.15rem; font-weight: 700; color: var(--navy); margin-bottom: 0.5rem; }
+    .form-success p { font-size: 0.9rem; color: var(--text-mid); }
+
+    /* ─── RESPONSIVE ─── */
+    @media (max-width: 900px) {
+      .hero-inner { grid-template-columns: 1fr; }
+      .hero-visual { display: none; }
+      .pain-grid { grid-template-columns: 1fr; }
+      .features-grid { grid-template-columns: 1fr; }
+      .testi-grid { grid-template-columns: 1fr; }
+      .stats-inner { grid-template-columns: repeat(2, 1fr); }
+      .steps { grid-template-columns: 1fr; }
+      .steps::before { display: none; }
+      .nav-links { display: none; }
+    }
+    @media (max-width: 600px) {
+      .cta-box { padding: 2.5rem 1.5rem; }
+      .hero { padding: 7rem 1.5rem 4rem; }
+      .stats-inner { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ─── NAV ─── -->
+<nav>
+  <div class="nav-inner">
+    <a href="#" class="nav-logo">
+      <img src="The HouseHub Logo Transparent .png" alt="TheHouseHub" style="height: 44px; width: auto;" />
+    </a>
+    <ul class="nav-links">
+      <li><a href="#features">Features</a></li>
+      <li><a href="#how-it-works">How It Works</a></li>
+      <li><a href="#founding">Founding Members</a></li>
+    </ul>
+    <div class="nav-cta">
+      <a href="#cta" class="btn-primary">Get Early Access</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ─── HERO ─── -->
+<section class="hero">
+  <div class="hero-inner">
+    <div class="hero-content">
+      <div class="hero-badge">Now in Beta · Limited Early Access</div>
+      <h1>Your Properties.<br/>Your Rules.<br/><em>Your Sanity Back.</em></h1>
+      <p class="hero-sub">TheHouseHub gives self-managing landlords one place to handle tenant requests, maintenance, leases, and payments. Your phone stops buzzing at 10pm.</p>
+      <div class="hero-actions">
+        <a href="#cta" class="btn-primary">Start Free Today</a>
+        <a href="#how-it-works" class="btn-outline">See How It Works</a>
+      </div>
+      <div class="hero-trust">
+        <span>✓ Free during beta &nbsp;·&nbsp; ✓ No credit card required &nbsp;·&nbsp; ✓ Limited founding spots</span>
+      </div>
+    </div>
+    <!-- App Mockup -->
+    <div class="hero-visual">
+      <div class="app-mockup">
+        <div class="mockup-bar">
+          <div class="mockup-dot d-red"></div>
+          <div class="mockup-dot d-yellow"></div>
+          <div class="mockup-dot d-green"></div>
+          <span class="mockup-title">The House Hub — Dashboard</span>
+        </div>
+        <div class="mockup-body">
+          <div class="dash-header">
+            <span class="dash-greeting">Good morning, Sarah 👋</span>
+            <span class="dash-date">Apr 9, 2026</span>
+          </div>
+          <div class="dash-cards">
+            <div class="dash-card">
+              <div class="dash-card-label">Properties</div>
+              <div class="dash-card-val">4</div>
+              <div class="dash-card-sub">All occupied ✓</div>
+            </div>
+            <div class="dash-card">
+              <div class="dash-card-label">Rent Collected</div>
+              <div class="dash-card-val teal">$8,400</div>
+              <div class="dash-card-sub">3 of 4 paid ✓</div>
+            </div>
+            <div class="dash-card">
+              <div class="dash-card-label">Open Requests</div>
+              <div class="dash-card-val">2</div>
+              <div class="dash-card-sub">↓ from 7 last week</div>
+            </div>
+            <div class="dash-card">
+              <div class="dash-card-label">Auto-Handled</div>
+              <div class="dash-card-val teal">94%</div>
+              <div class="dash-card-sub">By AI this month</div>
+            </div>
+          </div>
+          <div style="font-size:0.7rem;font-weight:700;color:#2B3577;margin-bottom:0.5rem;">Recent Tenant Messages</div>
+          <div class="msg-list">
+            <div class="msg-item">
+              <div class="msg-avatar" style="background:linear-gradient(135deg,#667eea,#764ba2)">JD</div>
+              <div class="msg-content">
+                <div class="msg-name">James D. · Apt 2B</div>
+                <div class="msg-text">The faucet in the kitchen is dripping...</div>
+              </div>
+              <span class="msg-badge badge-auto">AI Replied</span>
+            </div>
+            <div class="msg-item">
+              <div class="msg-avatar" style="background:linear-gradient(135deg,#f093fb,#f5576c)">ML</div>
+              <div class="msg-content">
+                <div class="msg-name">Maria L. · Unit 4A</div>
+                <div class="msg-text">When is my lease renewal due?</div>
+              </div>
+              <span class="msg-badge badge-auto">AI Replied</span>
+            </div>
+            <div class="msg-item">
+              <div class="msg-avatar" style="background:linear-gradient(135deg,#4facfe,#00f2fe)">RC</div>
+              <div class="msg-content">
+                <div class="msg-name">Ryan C. · Unit 1C</div>
+                <div class="msg-text">Parking spot question — neighbor...</div>
+              </div>
+              <span class="msg-badge badge-new">Needs You</span>
+            </div>
+            <div class="msg-item resolved">
+              <div class="msg-avatar" style="background:linear-gradient(135deg,#43e97b,#38f9d7)">PW</div>
+              <div class="msg-content">
+                <div class="msg-name">Paula W. · Unit 3D</div>
+                <div class="msg-text">Rent receipt for March?</div>
+              </div>
+              <span class="msg-badge badge-done">Resolved</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── PROMISES BAR ─── -->
+<section class="stats">
+  <div class="stats-inner">
+    <div>
+      <div class="stat-num">Free</div>
+      <div class="stat-label">100% free for all beta members</div>
+    </div>
+    <div>
+      <div class="stat-num">1</div>
+      <div class="stat-label">dashboard for all your properties</div>
+    </div>
+    <div>
+      <div class="stat-num">$0</div>
+      <div class="stat-label">per-unit fees. Ever.</div>
+    </div>
+    <div>
+      <div class="stat-num">Built</div>
+      <div class="stat-label">for self-managing landlords, by design</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── PAIN SECTION ─── -->
+<section class="pain" id="pain">
+  <div class="pain-inner">
+    <div class="pain-header">
+      <span class="section-label">Sound Familiar?</span>
+      <h2>Running rentals shouldn't hijack your life.</h2>
+      <p>Whether you inherited a property, bought one as a side hustle, or grew a small portfolio on your own: you already have a full-time life. Managing tenants shouldn't consume it too.</p>
+    </div>
+    <div class="pain-grid">
+      <div class="pain-card">
+        <div class="pain-emoji">📱</div>
+        <h3>"My heat isn't working" — at 11pm on a Friday</h3>
+        <p>Tenant emergencies don't follow business hours, and without a buffer, every notification lands directly in your personal life.</p>
+      </div>
+      <div class="pain-card">
+        <div class="pain-emoji">🗂️</div>
+        <h3>Lease dates, receipts, and maintenance all over the place</h3>
+        <p>Spreadsheets, email threads, text messages, paper files. Critical info is scattered and impossible to find when you need it fast.</p>
+      </div>
+      <div class="pain-card">
+        <div class="pain-emoji">💸</div>
+        <h3>A property manager costs 8–12% of your rent roll</h3>
+        <p>That's thousands of dollars a year leaving your pocket, just to have someone else deal with the calls you're already fielding yourself.</p>
+      </div>
+      <div class="pain-card">
+        <div class="pain-emoji">🔄</div>
+        <h3>The same questions. Over and over again.</h3>
+        <p>"Where do I pay rent?" "What's the WiFi password?" "When is trash day?" You've answered these a hundred times and you'll answer them a hundred more.</p>
+      </div>
+      <div class="pain-card">
+        <div class="pain-emoji">🏗️</div>
+        <h3>Maintenance requests slip through the cracks</h3>
+        <p>A small fix ignored becomes a big repair. Without a proper system, it's easy for requests to get lost in the noise — until a tenant is furious.</p>
+      </div>
+      <div class="pain-card">
+        <div class="pain-emoji">😮‍💨</div>
+        <h3>You can't scale what you can't manage</h3>
+        <p>You want to grow your portfolio but the thought of adding another property to your current chaos? That keeps you up at night.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── FOUNDER STRIP ─── -->
+<section class="founder-strip">
+  <div class="founder-strip-inner">
+    <div class="founder-quote-mark">"</div>
+    <div class="founder-body">
+      <p class="founder-text">We built TheHouseHub because we were living this problem. Late-night texts from tenants, maintenance requests buried in our inbox, lease dates we nearly missed — all while working full-time jobs. We couldn't find a tool built for landlords like us, so we built one ourselves. Everything on this page is a pain point we've personally felt.</p>
+      <span class="founder-byline">— The TheHouseHub Team, self-managing landlords</span>
+    </div>
+  </div>
+</section>
+
+<!-- ─── SOLUTION / FEATURES ─── -->
+<section class="solution" id="features">
+  <div class="solution-inner">
+    <div class="solution-header">
+      <span class="section-label">The Solution</span>
+      <h2>Everything you need. <span class="grad-text">Nothing you don't.</span></h2>
+      <p>Built by self-managing landlords, for self-managing landlords. No bloated software designed for big property companies. No per-unit fees. No learning curve.</p>
+    </div>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">🤖</div>
+        <div class="feature-text">
+          <h3>AI-Powered Tenant Messaging</h3>
+          <p>Our built-in AI handles routine tenant messages automatically, answering FAQs, acknowledging requests, and routing real issues to you. Most tenants never even know it's not you.</p>
+        </div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔧</div>
+        <div class="feature-text">
+          <h3>Maintenance Request Tracking</h3>
+          <p>Tenants submit requests through a clean portal. You get organized tickets with photos, priority levels, and status updates. Nothing falls through the cracks again.</p>
+        </div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📋</div>
+        <div class="feature-text">
+          <h3>Lease & Document Management</h3>
+          <p>Store leases, renewal dates, move-in checklists, and tenant documents in one searchable place. Get automated reminders before key dates so you're never caught off-guard.</p>
+        </div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">💳</div>
+        <div class="feature-text">
+          <h3>Rent Collection & Payment Tracking</h3>
+          <p>Tenants pay online, you get paid on time. Automated late payment reminders go out without you lifting a finger, keeping things professional without awkward conversations.</p>
+        </div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔕</div>
+        <div class="feature-text">
+          <h3>Do Not Disturb Mode</h3>
+          <p>Set hours when tenant notifications are silenced. The Hub still captures and triages everything. You see a clean summary when you're ready. Your evenings are yours again.</p>
+        </div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📊</div>
+        <div class="feature-text">
+          <h3>Property Dashboard at a Glance</h3>
+          <p>One clean dashboard shows rent status, open requests, upcoming lease dates, and maintenance logs across all your properties. Know everything in 30 seconds.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── HOW IT WORKS ─── -->
+<section class="how" id="how-it-works">
+  <div class="how-inner">
+    <div class="how-header">
+      <span class="section-label" style="background:rgba(69,201,181,.15);color:var(--teal);">Getting Started</span>
+      <h2>Up and running in under an hour.</h2>
+      <p>No IT department required. No month-long onboarding. Just set it up and start getting your time back.</p>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <h3>Add Your Properties</h3>
+        <p>Enter your units, upload existing leases, and add tenant contact info. Takes about 3 minutes per property.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <h3>Invite Your Tenants</h3>
+        <p>Tenants get a simple link to their portal. No app download required. They can submit requests, pay rent, and message you all in one place.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <h3>Let the Hub Handle It</h3>
+        <p>The AI manages routine communication, requests get organized, and you only get pinged when something genuinely needs your attention.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── FOUNDING MEMBERS ─── -->
+<section class="testimonials" id="founding">
+  <div class="testimonials-inner">
+    <div class="testimonials-header">
+      <span class="section-label">Beta · Limited Spots</span>
+      <h2>Become a Founding Member.</h2>
+      <p>We're opening TheHouseHub to a small group of independent landlords first. Founding members shape the product and lock in benefits that won't be available at launch.</p>
+    </div>
+    <div class="testi-grid">
+      <div class="testi-card" style="border-top: 3px solid var(--navy);">
+        <div style="font-size:2rem;margin-bottom:1rem;">🎟️</div>
+        <h3 style="font-size:1.05rem;font-weight:700;color:var(--navy);margin-bottom:0.5rem;">Free for the Entire Beta</h3>
+        <p style="font-size:0.9rem;color:var(--text-mid);line-height:1.65;">No trials, no credit card, no catch. Use the full product at no cost for the entire beta period.</p>
+      </div>
+      <div class="testi-card" style="border-top: 3px solid var(--teal-dark);">
+        <div style="font-size:2rem;margin-bottom:1rem;">🔒</div>
+        <h3 style="font-size:1.05rem;font-weight:700;color:var(--navy);margin-bottom:0.5rem;">Locked-In Founding Pricing</h3>
+        <p style="font-size:0.9rem;color:var(--text-mid);line-height:1.65;">When we launch paid plans, founding members keep a permanently discounted rate, grandfathered in for life regardless of how pricing changes.</p>
+      </div>
+      <div class="testi-card" style="border-top: 3px solid var(--navy);">
+        <div style="font-size:2rem;margin-bottom:1rem;">🎙️</div>
+        <h3 style="font-size:1.05rem;font-weight:700;color:var(--navy);margin-bottom:0.5rem;">Direct Line to the Builder</h3>
+        <p style="font-size:0.9rem;color:var(--text-mid);line-height:1.65;">Your feedback directly shapes what we build next. Founding members get a private channel to report issues, request features, and influence the roadmap.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── FINAL CTA ─── -->
+<section class="cta-section" id="cta">
+  <div class="cta-box">
+    <h2>Ready to stop being on call for your own properties?</h2>
+    <p>Join our founding member beta, completely free. Help shape the product and lock in pricing that won't be available at launch.</p>
+    <div class="cta-actions">
+      <a href="#" class="btn-primary" onclick="openSignup(event)">Get Early Access — It's Free</a>
+      <a href="#how-it-works" class="btn-outline">See How It Works First</a>
+    </div>
+    <p class="cta-note">No credit card required &nbsp;·&nbsp; Free during beta &nbsp;·&nbsp; Cancel anytime</p>
+  </div>
+</section>
+
+<!-- ─── FOOTER ─── -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <img src="The HouseHub Logo Transparent .png" alt="TheHouseHub" style="height: 36px; width: auto; filter: brightness(0) invert(1); opacity: 0.85;" />
+    </div>
+    <div class="footer-links">
+      <a href="privacy.html">Privacy Policy</a>
+      <a href="terms.html">Terms &amp; Conditions</a>
+      <a href="#" onclick="openContact(event)">Contact</a>
+    </div>
+    <span class="footer-copy">© 2026 TheHouseHub. All rights reserved.</span>
+  </div>
+</footer>
+
+<!-- ─── CONTACT MODAL ─── -->
+<div class="modal-overlay" id="contactModal" onclick="handleOverlayClick(event)">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeContact()" aria-label="Close">✕</button>
+    <div id="formContent">
+      <h2>Get in Touch</h2>
+      <p>Have a question, a feature idea, or just want to say hello? We'd love to hear from you.</p>
+      <!-- ⚠️ Replace YOUR_FORM_ID with your Formspree form ID from formspree.io -->
+      <form id="contactForm" action="https://formspree.io/f/YOUR_FORM_ID" method="POST">
+        <div class="form-group">
+          <label for="contact-name">Your Name</label>
+          <input type="text" id="contact-name" name="name" placeholder="e.g. Sarah Johnson" required />
+        </div>
+        <div class="form-group">
+          <label for="contact-email">Email Address</label>
+          <input type="email" id="contact-email" name="email" placeholder="you@example.com" required />
+        </div>
+        <div class="form-group">
+          <label for="contact-subject">What's this about?</label>
+          <select id="contact-subject" name="subject">
+            <option value="">Select a topic...</option>
+            <option value="Early Access">Early access / beta signup</option>
+            <option value="Feature Request">Feature request</option>
+            <option value="Press / Media">Press &amp; media</option>
+            <option value="Partnership">Partnership inquiry</option>
+            <option value="Other">Something else</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="contact-message">Message</label>
+          <textarea id="contact-message" name="message" placeholder="Tell us what's on your mind..." required></textarea>
+        </div>
+        <button type="submit" class="btn-primary form-submit">Send Message</button>
+      </form>
+    </div>
+    <div class="form-success" id="formSuccess">
+      <div class="success-icon">✅</div>
+      <h3>Message sent!</h3>
+      <p>Thanks for reaching out. We'll get back to you within 1–2 business days.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Scroll reveal
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.style.opacity = '1';
+        entry.target.style.transform = 'translateY(0)';
+      }
+    });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('.pain-card, .feature-card, .testi-card, .step').forEach(el => {
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(24px)';
+    el.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+    observer.observe(el);
+  });
+
+  // Contact modal
+  function openContact(e) {
+    if (e) e.preventDefault();
+    document.getElementById('contactModal').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeContact() {
+    document.getElementById('contactModal').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+  function handleOverlayClick(e) {
+    if (e.target === document.getElementById('contactModal')) closeContact();
+  }
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeContact(); });
+
+  // Formspree submission
+  const form = document.getElementById('contactForm');
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = form.querySelector('button[type="submit"]');
+    btn.textContent = 'Sending…';
+    btn.disabled = true;
+    try {
+      const res = await fetch(form.action, {
+        method: 'POST',
+        body: new FormData(form),
+        headers: { 'Accept': 'application/json' }
+      });
+      if (res.ok) {
+        document.getElementById('formContent').style.display = 'none';
+        document.getElementById('formSuccess').style.display = 'block';
+      } else {
+        btn.textContent = 'Something went wrong — try again';
+        btn.disabled = false;
+      }
+    } catch {
+      btn.textContent = 'Something went wrong — try again';
+      btn.disabled = false;
+    }
+  });
+</script>
+
+
+
+
+
+<!-- SIGNUP MODAL -->
+<div class="modal-overlay" id="signupModal" onclick="handleSignupOverlayClick(event)">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeSignup()">✕</button>
+
+    <h2>Create Your Landlord Account</h2>
+    <p>Start managing your properties in minutes.</p>
+
+    <form id="signupForm">
+      <div class="form-group">
+        <label>Full Name</label>
+        <input type="text" name="name" required />
+      </div>
+
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" name="email" required />
+      </div>
+
+      <div class="form-group">
+        <label>Company / Property Name</label>
+        <input type="text" name="companyName" required />
+      </div>
+
+      <button type="submit" class="btn-primary form-submit">
+        Create My Account
+      </button>
+    </form>
+
+    <div class="form-success" id="signupSuccess" style="display:none;">
+      <h3>✅ Account Created</h3>
+      <p>Check your email for login details.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+function openSignup(e) {
+  if (e) e.preventDefault();
+  document.getElementById('signupModal').classList.add('open');
+}
+
+function closeSignup() {
+  document.getElementById('signupModal').classList.remove('open');
+}
+
+function handleSignupOverlayClick(e) {
+  if (e.target.id === 'signupModal') closeSignup();
+}
+
+document.getElementById("signupForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const form = e.target;
+  const btn = form.querySelector("button");
+
+  btn.textContent = "Creating...";
+  btn.disabled = true;
+
+  const data = {
+    name: form.name.value,
+    email: form.email.value,
+    companyName: form.companyName.value,
+  };
+
+  try {
+    const res = await fetch("https://propertyos-backend.onrender.com/api/public/register-landlord", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+
+    const result = await res.json();
+
+    if (res.ok) {
+      form.style.display = "none";
+      document.getElementById("signupSuccess").style.display = "block";
+    } else {
+      alert(result.error || "Something went wrong");
+      btn.textContent = "Try Again";
+      btn.disabled = false;
+    }
+  } catch (err) {
+    alert("Server error");
+    btn.textContent = "Try Again";
+    btn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>
