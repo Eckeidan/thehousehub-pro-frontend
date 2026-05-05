@@ -41,6 +41,7 @@ type StoredUser = {
   name?: string;
   email?: string;
   role?: string;
+  organizationId?: string;
 };
 
 const quickActions = [
@@ -296,7 +297,8 @@ export default function DashboardPage() {
             <p className="text-xs uppercase tracking-widest text-blue-200/50">
               Current Role
             </p>
-            <p className="mt-2 font-semibold">{displayRole}</p>
+            <p className="text-xs text-slate-500">{displayRole}</p>
+            
 
             <div className="mt-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/10 px-3 py-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-500 text-sm font-bold text-white">
@@ -306,7 +308,12 @@ export default function DashboardPage() {
                 <p className="truncate text-sm font-semibold text-white">
                   {user?.fullName || user?.name || "User"}
                 </p>
+
                 <p className="text-xs text-blue-100/80">{displayRole}</p>
+
+                <p className="mt-1 truncate rounded-lg bg-black/20 px-2 py-1 text-[10px] font-mono text-emerald-200">
+                  Org: {user?.organizationId || "No organizationId"}
+                </p>
               </div>
             </div>
 
@@ -357,6 +364,9 @@ export default function DashboardPage() {
                       {user?.fullName || user?.name || "User"}
                     </p>
                     <p className="text-xs text-slate-500">{displayRole}</p>
+                    <p className="max-w-[180px] truncate text-[10px] font-mono text-emerald-600">
+                      Org: {user?.organizationId || "No organizationId"}
+                    </p>
                   </div>
                 </div>
               </div>

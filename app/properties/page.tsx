@@ -57,6 +57,7 @@ type Property = {
   availableFrom?: string | null;
   ownerName?: string | null;
   occupancyStatus?: string | null;
+  organizationId?: string;
 };
 
 type PropertyFormData = {
@@ -92,6 +93,7 @@ type StoredUser = {
   name?: string;
   email?: string;
   role?: string;
+  organizationId?: string;
 };
 
 const API_URL =
@@ -650,7 +652,10 @@ export default function PropertiesPage() {
       <div className="flex min-h-screen">
         <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 bg-gradient-to-b from-blue-950 via-blue-900 to-slate-900 text-white shadow-2xl lg:flex lg:flex-col">
           <div className="border-b border-white/10 px-6 py-7">
-            <h1 className="text-3xl font-bold tracking-tight">PropertyOS</h1>
+            <h1 className="text-3xl font-bold tracking-tight">
+              <span className="text-white">The House</span>{" "}
+              <span className="text-emerald-400">Hub</span>
+            </h1>
             <p className="mt-2 text-sm text-blue-100/70">
               Smart Property Management
             </p>
@@ -731,8 +736,11 @@ export default function PropertiesPage() {
                 <p className="truncate text-sm font-semibold text-white">
                   {user?.fullName || user?.name || "User"}
                 </p>
-                <p className="truncate text-xs text-blue-100/70">
-                  {user?.email || displayRole}
+
+                <p className="text-xs text-blue-100/80">{displayRole}</p>
+
+                <p className="mt-1 truncate rounded-lg bg-black/20 px-2 py-1 text-[10px] font-mono text-emerald-200">
+                  Org: {user?.organizationId || "No organizationId"}
                 </p>
               </div>
             </div>
@@ -779,6 +787,9 @@ export default function PropertiesPage() {
                       {user?.fullName || user?.name || "User"}
                     </p>
                     <p className="text-xs text-slate-500">{displayRole}</p>
+                    <p className="mt-1 truncate rounded-lg bg-black/20 px-2 py-1 text-[10px] font-mono text-emerald-200">
+                      Org: {user?.organizationId || "No organizationId"}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -884,6 +895,7 @@ export default function PropertiesPage() {
                               Code {renderSortIcon("code")}
                             </button>
                           </th>
+                          <th className="px-4 py-2">Org ID</th>
                           <th className="px-4 py-2">
                             <button
                               type="button"
@@ -942,8 +954,13 @@ export default function PropertiesPage() {
                             onClick={() => handleRowClick(property.id)}
                             className="cursor-pointer rounded-2xl bg-slate-50 shadow-sm transition hover:bg-slate-100"
                           >
+                            
                             <td className="rounded-l-2xl px-4 py-4 font-medium text-slate-700">
                               {property.code}
+                            </td>
+
+                            <td className="px-4 py-4 text-xs font-mono text-emerald-600">
+                                {property.organizationId || "-"}
                             </td>
 
                             <td className="px-4 py-4 font-semibold text-slate-900">
