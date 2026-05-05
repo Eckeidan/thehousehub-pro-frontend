@@ -141,6 +141,9 @@ export default function DashboardPage() {
         }
 
         const data = await res.json();
+
+        console.log("DASHBOARD DATA:", data);
+        
         setStats(data);
       } catch (err) {
         console.error("Dashboard fetch error:", err);
