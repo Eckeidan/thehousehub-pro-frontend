@@ -26,6 +26,7 @@ import {
   Settings,
   Wrench,
   LogOut,
+  MessageCircle,
 } from "lucide-react";
 
 type TenantStatus = "ACTIVE" | "INACTIVE" | "PENDING";
@@ -37,6 +38,7 @@ type StoredUser = {
   name?: string;
   email?: string;
   role?: string;
+  organizationId?: string;
 };
 
 interface Property {
@@ -47,6 +49,7 @@ interface Property {
 
 interface Tenant {
   id: string;
+  organizationId?: string;
   firstName: string;
   lastName: string;
   phone?: string | null;
@@ -172,6 +175,9 @@ export default function TenantsPage() {
 
       const token = localStorage.getItem("token");
 
+      console.log("TENANTS API_URL USED:", API_URL);
+      console.log("CURRENT USER ORG:", user?.organizationId);
+
       const res = await fetch(`${API_URL}/api/tenants`, {
         cache: "no-store",
         headers: {
@@ -211,6 +217,8 @@ export default function TenantsPage() {
       }
 
       const data = await res.json();
+
+      console.log("TENANTS DATA:", data);
       setTenants(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Error fetching tenants:", err);
@@ -224,6 +232,15 @@ export default function TenantsPage() {
       setLoading(false);
     }
   }
+
+  const initials =
+    (user?.fullName || user?.name || "User")
+      .split(" ")
+      .map((part) => part[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "US";
+
 
   function openDeleteModal(tenant: Tenant) {
     setSelectedTenant(tenant);
@@ -291,6 +308,11 @@ export default function TenantsPage() {
       setDeleting(false);
     }
   }
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    router.replace("/");
+  };
 
   const filteredTenants = useMemo(() => {
     const query = searchTerm.toLowerCase().trim();
@@ -368,6 +390,7 @@ export default function TenantsPage() {
               <span className="text-white">The House</span>{" "}
               <span className="text-emerald-400">Hub</span>
             </h1>
+
             <p className="mt-2 text-xs text-blue-100/60">
               Smart Property Management
             </p>
@@ -379,85 +402,89 @@ export default function TenantsPage() {
             </p>
 
             <div className="space-y-2">
-                          <SidebarItem
-                            label="Dashboard"
-                            icon={<LayoutDashboard size={18} />}
-                            
-                            href="/dashboard"
-                          />
-                          <SidebarItem
-                            label="Properties"
-                            icon={<Building2 size={18} />}
-                            href="/properties"
-                          />
-                          <SidebarItem
-                            label="Tenants"
-                            icon={<Users size={18} />}
-                            active
-                            href="/tenants"
-                          />
-                          <SidebarItem
-                            label="Units"
-                            icon={<Home size={18} />}
-                            href="/units"
-                          />
-                          <SidebarItem
-                            label="Vendors"
-                            icon={<Wrench size={18} />}
-                            href="/vendors"
-                          />
-                          <SidebarItem
-                            label="Maintenance"
-                            icon={<Wrench size={18} />}
-                            href="/maintenance"
-                          />
-                          <SidebarItem
-                            label="Financials"
-                            icon={<Wallet size={18} />}
-                            href="/payments"
-                          />
-                          <SidebarItem
-                            label="Documents"
-                            icon={<FileText size={18} />}
-                            href="/documents"
-                          />
-                          <SidebarItem
-                            label="AI Insights"
-                            icon={<Brain size={18} />}
-                            href="/insights"
-                          />
-                          <SidebarItem
-                            label="Settings"
-                            icon={<Settings size={18} />}
-                            href="/settings"
-                          />
-                        </div>
+              <SidebarItem
+                label="Dashboard"
+                icon={<LayoutDashboard size={18} />}
+                href="/dashboard"
+              />
+              <SidebarItem
+                label="Properties"
+                icon={<Building2 size={18} />}
+                href="/properties"
+              />
+              <SidebarItem
+                label="Units"
+                icon={<Home size={18} />}
+                href="/units"
+              />
+              <SidebarItem
+                label="Tenants"
+                icon={<Users size={18} />}
+                active
+                href="/tenants"
+              />
+              
+              <SidebarItem
+                label="Vendors"
+                icon={<Wrench size={18} />}
+                href="/vendors"
+              />
+              <SidebarItem
+                label="Maintenance"
+                icon={<Wrench size={18} />}
+                href="/maintenance"
+              />
+              <SidebarItem
+                label="Financials"
+                icon={<Wallet size={18} />}
+                href="/payments"
+              />
+
+              <SidebarItem label="Messages" icon={<MessageCircle size={18} />} href="/communications"  />
+              <SidebarItem
+                label="Documents"
+                icon={<FileText size={18} />}
+                href="/documents"
+              />
+              <SidebarItem
+                label="AI Insights"
+                icon={<Brain size={18} />}
+                href="/insights"
+              />
+              <SidebarItem
+                label="Settings"
+                icon={<Settings size={18} />}
+                href="/settings"
+              />
+            </div>
           </nav>
 
           <div className="border-t border-white/10 px-6 py-5">
             <p className="text-xs uppercase tracking-widest text-blue-200/50">
               Current Role
             </p>
-            <p className="mt-2 font-semibold">{displayRole}</p>
+            <p className="text-xs text-slate-500">{displayRole}</p>
+            
 
             <div className="mt-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/10 px-3 py-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-500 text-sm font-bold text-white">
-                {userInitials}
+                {initials}
               </div>
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-white">
                   {user?.fullName || user?.name || "User"}
                 </p>
+
                 <p className="text-xs text-blue-100/80">{displayRole}</p>
+
+                <p className="mt-1 truncate rounded-lg bg-black/20 px-2 py-1 text-[10px] font-mono text-emerald-200">
+                  Org: {user?.organizationId || "No organizationId"}
+                </p>
               </div>
             </div>
 
             <button
-              onClick={() => {
-                localStorage.removeItem("token");
-                localStorage.removeItem("user");
-                window.location.href = "/";
-              }}
+              onClick={handleLogout}
               className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-200 transition hover:bg-red-500/20 hover:text-white"
             >
               <LogOut size={16} />
@@ -673,6 +700,10 @@ export default function TenantsPage() {
                                   </p>
                                   <p className="text-xs text-slate-500">
                                     Tenant ID: #{tenant.id}
+                                    <br />
+                                    <span className="font-mono text-[10px] text-emerald-600">
+                                      Org: {tenant.organizationId || "-"}
+                                    </span>
                                   </p>
                                 </div>
                               </div>

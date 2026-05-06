@@ -83,7 +83,7 @@ export default function DashboardPage() {
   const [user, setUser] = useState<StoredUser | null>(null);
 
   const API_BASE =
-    process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/";
+    process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -120,13 +120,15 @@ export default function DashboardPage() {
       try {
         const token = localStorage.getItem("token");
 
+        console.log("DASHBOARD API_BASE USED:", API_BASE);
+
         const res = await fetch(`${API_BASE}/api/dashboard`, {
           method: "GET",
+          cache: "no-store",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token || ""}`,
           },
-          credentials: "include",
         });
 
         if (res.status === 401) {
@@ -143,7 +145,7 @@ export default function DashboardPage() {
         const data = await res.json();
 
         console.log("DASHBOARD DATA:", data);
-        
+
         setStats(data);
       } catch (err) {
         console.error("Dashboard fetch error:", err);
@@ -252,15 +254,16 @@ export default function DashboardPage() {
                 href="/properties"
               />
               <SidebarItem
-                label="Tenants"
-                icon={<Users size={18} />}
-                href="/tenants"
-              />
-              <SidebarItem
                 label="Units"
                 icon={<Home size={18} />}
                 href="/units"
               />
+              <SidebarItem
+                label="Tenants"
+                icon={<Users size={18} />}
+                href="/tenants"
+              />
+              
               <SidebarItem
                 label="Vendors"
                 icon={<Wrench size={18} />}

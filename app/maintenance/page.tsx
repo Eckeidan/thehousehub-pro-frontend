@@ -27,6 +27,7 @@ import {
   UserCircle2,
   ShieldCheck,
   BadgeDollarSign,
+  MessageCircle,
 } from "lucide-react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
@@ -37,6 +38,7 @@ type StoredUser = {
   name?: string;
   email?: string;
   role?: string;
+  organizationId?: string;
 };
 
 type AIRecommendation = {
@@ -375,6 +377,7 @@ export default function MaintenancePage() {
               <span className="text-white">The House</span>{" "}
               <span className="text-emerald-400">Hub</span>
             </h1>
+
             <p className="mt-2 text-xs text-blue-100/60">
               Smart Property Management
             </p>
@@ -397,15 +400,16 @@ export default function MaintenancePage() {
                 href="/properties"
               />
               <SidebarItem
-                label="Tenants"
-                icon={<Users size={18} />}
-                href="/tenants"
-              />
-              <SidebarItem
                 label="Units"
                 icon={<Home size={18} />}
                 href="/units"
               />
+              <SidebarItem
+                label="Tenants"
+                icon={<Users size={18} />}
+                href="/tenants"
+              />
+              
               <SidebarItem
                 label="Vendors"
                 icon={<Wrench size={18} />}
@@ -422,6 +426,8 @@ export default function MaintenancePage() {
                 icon={<Wallet size={18} />}
                 href="/payments"
               />
+
+              <SidebarItem label="Messages" icon={<MessageCircle size={18} />} href="/communications"  />
               <SidebarItem
                 label="Documents"
                 icon={<FileText size={18} />}
@@ -444,7 +450,8 @@ export default function MaintenancePage() {
             <p className="text-xs uppercase tracking-widest text-blue-200/50">
               Current Role
             </p>
-            <p className="mt-2 font-semibold">{displayRole}</p>
+            <p className="text-xs text-slate-500">{displayRole}</p>
+            
 
             <div className="mt-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/10 px-3 py-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-500 text-sm font-bold text-white">
@@ -454,7 +461,12 @@ export default function MaintenancePage() {
                 <p className="truncate text-sm font-semibold text-white">
                   {user?.fullName || user?.name || "User"}
                 </p>
+
                 <p className="text-xs text-blue-100/80">{displayRole}</p>
+
+                <p className="mt-1 truncate rounded-lg bg-black/20 px-2 py-1 text-[10px] font-mono text-emerald-200">
+                  Org: {user?.organizationId || "No organizationId"}
+                </p>
               </div>
             </div>
 

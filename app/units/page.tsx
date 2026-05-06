@@ -33,6 +33,7 @@ type StoredUser = {
   name?: string;
   email?: string;
   role?: string;
+  organizationId?: string;
 };
 
 type Property = {
@@ -45,6 +46,7 @@ type Property = {
 
 type Unit = {
   id: string;
+  organizationId?: string;
   propertyId: string;
   unitCode: string;
   unitName?: string | null;
@@ -144,6 +146,8 @@ export default function UnitsPage() {
 
       const token = localStorage.getItem("token");
 
+      console.log("UNITS API_BASE USED:", API_BASE);
+
       const res = await fetch(
   `${API_BASE}/api/units${queryString ? `?${queryString}` : ""}`,
   {
@@ -167,6 +171,8 @@ export default function UnitsPage() {
       }
 
       const data = await res.json();
+
+      console.log("UNITS DATA:", data);
       setUnits(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
