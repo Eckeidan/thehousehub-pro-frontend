@@ -7,19 +7,9 @@ import {
   useState,
   type ChangeEvent,
   type FormEvent,
-  type ReactNode,
   type MouseEvent,
 } from "react";
-import Link from "next/link";
 import {
-  LayoutDashboard,
-  Building2,
-  Users,
-  Wrench,
-  Wallet,
-  FileText,
-  Brain,
-  Settings,
   Plus,
   Pencil,
   Trash2,
@@ -30,10 +20,9 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  LogOut,
-  Home,
   ShieldCheck,
 } from "lucide-react";
+import AdminShell from "@/components/AdminShell";
 
 type Property = {
   id: string;
@@ -96,8 +85,7 @@ type StoredUser = {
   organizationId?: string;
 };
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 const PROPERTY_TYPES = [
   { label: "Apartment", value: "APARTMENT" },
@@ -206,6 +194,7 @@ export default function PropertiesPage() {
   const [formData, setFormData] = useState<PropertyFormData>(
     createInitialFormData()
   );
+
   const [editingPropertyId, setEditingPropertyId] = useState<string | null>(
     null
   );
@@ -354,6 +343,7 @@ export default function PropertiesPage() {
       ownerName: property.ownerName ?? "",
       occupancyStatus: property.occupancyStatus ?? "AVAILABLE",
     });
+
     setShowAddModal(true);
   };
 
@@ -366,7 +356,6 @@ export default function PropertiesPage() {
 
   const handleSaveProperty = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-
     if (!canEdit) return;
 
     try {
@@ -374,6 +363,7 @@ export default function PropertiesPage() {
 
       const token = localStorage.getItem("token");
       const isEditing = editingPropertyId !== null;
+
       const currentProperty = isEditing
         ? properties.find((p) => p.id === editingPropertyId)
         : null;
@@ -411,9 +401,7 @@ export default function PropertiesPage() {
             ? parseFloat(formData.areaSqm)
             : null,
         floor:
-          formData.floor.trim() !== ""
-            ? parseInt(formData.floor, 10)
-            : null,
+          formData.floor.trim() !== "" ? parseInt(formData.floor, 10) : null,
         furnishingStatus: formData.furnishingStatus || null,
         parkingSpaces:
           formData.parkingSpaces.trim() !== ""
@@ -440,17 +428,12 @@ export default function PropertiesPage() {
         body: JSON.stringify(payload),
       });
 
-      let data: any = null;
-      try {
-        data = await res.json();
-      } catch {
-        data = null;
-      }
+      const data = await res.json().catch(() => null);
 
       if (res.status === 401) {
         localStorage.removeItem("token");
         localStorage.removeItem("user");
-        window.location.href = "/";
+        router.replace("/");
         return;
       }
 
@@ -483,17 +466,12 @@ export default function PropertiesPage() {
         },
       });
 
-      let data: any = null;
-      try {
-        data = await res.json();
-      } catch {
-        data = null;
-      }
+      const data = await res.json().catch(() => null);
 
       if (res.status === 401) {
         localStorage.removeItem("token");
         localStorage.removeItem("user");
-        window.location.href = "/";
+        router.replace("/");
         return;
       }
 
@@ -507,12 +485,6 @@ export default function PropertiesPage() {
       console.error("Delete property error:", err);
       alert(err.message || "Failed to delete property.");
     }
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    window.location.href = "/";
   };
 
   const uniqueCities = useMemo(() => {
@@ -608,9 +580,11 @@ export default function PropertiesPage() {
     if (sortField !== field) {
       return <ArrowUpDown size={14} className="ml-1 inline" />;
     }
+
     if (sortDirection === "asc") {
       return <ArrowUp size={14} className="ml-1 inline" />;
     }
+
     return <ArrowDown size={14} className="ml-1 inline" />;
   };
 
@@ -628,25 +602,10 @@ export default function PropertiesPage() {
     filteredAndSortedProperties.length
   );
 
-  const initials =
-    (user?.fullName || user?.name || "User")
-      .split(" ")
-      .map((part) => part[0])
-      .join("")
-      .slice(0, 2)
-      .toUpperCase() || "US";
-
-  const displayRole =
-    normalizedRole === "ADMIN"
-      ? "Admin"
-      : normalizedRole === "OWNER"
-      ? "Super Admin"
-      : "User";
-
   if (checkingAuth) {
     return (
-      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-8">
-        <div className="rounded-3xl bg-white px-8 py-6 shadow-xl border border-slate-200 text-slate-700">
+      <div className="flex min-h-screen items-center justify-center bg-slate-100 p-8">
+        <div className="rounded-3xl border border-slate-200 bg-white px-8 py-6 text-slate-700 shadow-xl">
           Checking session...
         </div>
       </div>
@@ -654,450 +613,317 @@ export default function PropertiesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900">
-      <div className="flex min-h-screen">
-        <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 bg-gradient-to-b from-blue-950 via-blue-900 to-slate-900 text-white shadow-2xl lg:flex lg:flex-col">
-          <div className="border-b border-white/10 px-6 py-7">
-            <h1 className="text-3xl font-bold tracking-tight">
-              <span className="text-white">The House</span>{" "}
-              <span className="text-emerald-400">Hub</span>
-            </h1>
-            <p className="mt-2 text-sm text-blue-100/70">
-              Smart Property Management
+    <AdminShell
+      user={user}
+      activeItem="properties"
+      title="Properties"
+      subtitle="Manage and review all registered properties."
+      actions={
+        canEdit ? (
+          <button
+            onClick={openAddModal}
+            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-blue-700"
+          >
+            <Plus size={16} />
+            Add Property
+          </button>
+        ) : null
+      }
+    >
+      {isSuperAdmin && (
+        <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-700">
+          <div className="flex items-start gap-3">
+            <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />
+            <div>
+              <p className="font-semibold">Read-only Super Admin mode</p>
+              <p className="mt-1">
+                You can review all properties, but only Admin can add, edit, or
+                delete properties.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div>
+            <h3 className="text-xl font-semibold text-slate-900">
+              Properties List
+            </h3>
+            <p className="text-sm text-slate-500">
+              All properties currently available in the system
             </p>
           </div>
 
-          <nav className="flex-1 overflow-y-auto px-4 py-6">
-            <p className="mb-3 px-3 text-xs font-semibold uppercase tracking-widest text-blue-200/50">
-              Main Menu
-            </p>
-
-            <div className="space-y-2">
-                          <SidebarItem
-                            label="Dashboard"
-                            icon={<LayoutDashboard size={18} />}
-                            
-                            href="/dashboard"
-                          />
-                          <SidebarItem
-                            label="Properties"
-                            icon={<Building2 size={18} />}
-                            active
-                            href="/properties"
-                          />
-                          <SidebarItem
-                            label="Tenants"
-                            icon={<Users size={18} />}
-                            href="/tenants"
-                          />
-                          <SidebarItem
-                            label="Units"
-                            icon={<Home size={18} />}
-                            href="/units"
-                          />
-                          <SidebarItem
-                            label="Vendors"
-                            icon={<Wrench size={18} />}
-                            href="/vendors"
-                          />
-                          <SidebarItem
-                            label="Maintenance"
-                            icon={<Wrench size={18} />}
-                            href="/maintenance"
-                          />
-                          <SidebarItem
-                            label="Financials"
-                            icon={<Wallet size={18} />}
-                            href="/payments"
-                          />
-                          <SidebarItem
-                            label="Documents"
-                            icon={<FileText size={18} />}
-                            href="/documents"
-                          />
-                          <SidebarItem
-                            label="AI Insights"
-                            icon={<Brain size={18} />}
-                            href="/insights"
-                          />
-                          <SidebarItem
-                            label="Settings"
-                            icon={<Settings size={18} />}
-                            href="/settings"
-                          />
-                        </div>
-          </nav>
-
-          <div className="border-t border-white/10 px-6 py-5">
-            <p className="text-xs uppercase tracking-widest text-blue-200/50">
-              Current Role
-            </p>
-            <p className="mt-2 font-semibold">{displayRole}</p>
-
-            <div className="mt-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/10 px-3 py-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
-                {initials}
-              </div>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-white">
-                  {user?.fullName || user?.name || "User"}
-                </p>
-
-                <p className="text-xs text-blue-100/80">{displayRole}</p>
-
-                <p className="mt-1 truncate rounded-lg bg-black/20 px-2 py-1 text-[10px] font-mono text-emerald-200">
-                  Org: {user?.organizationId || "No organizationId"}
-                </p>
-              </div>
-            </div>
-
-            <button
-              onClick={handleLogout}
-              className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-200 transition hover:bg-red-500/20 hover:text-white"
-            >
-              <LogOut size={16} />
-              Logout
-            </button>
+          <div className="rounded-xl bg-slate-100 px-4 py-2 text-sm text-slate-600">
+            Total: {filteredAndSortedProperties.length}
           </div>
-        </aside>
+        </div>
 
-        <main className="flex-1 lg:ml-72">
-          <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
-            <div className="flex flex-col gap-5 px-6 py-5 md:flex-row md:items-center md:justify-between md:px-8">
-              <div>
-                <h2 className="text-3xl font-bold tracking-tight text-slate-900">
-                  Properties
-                </h2>
-                <p className="mt-1 text-slate-500">
-                  Manage and review all registered properties
-                </p>
-              </div>
+        <div className="mb-6 grid grid-cols-1 gap-3 lg:grid-cols-4">
+          <div className="relative lg:col-span-2">
+            <Search
+              size={16}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+            <input
+              type="text"
+              placeholder="Search property, code, address, city..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full rounded-xl border border-slate-300 py-3 pl-10 pr-4 outline-none focus:border-blue-500"
+            />
+          </div>
 
-              <div className="flex items-center gap-3">
-                {canEdit && (
-                  <button
-                    onClick={openAddModal}
-                    className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-blue-700"
-                  >
-                    <Plus size={16} />
-                    Add Property
-                  </button>
-                )}
+          <select
+            value={cityFilter}
+            onChange={(e) => setCityFilter(e.target.value)}
+            className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
+          >
+            {uniqueCities.map((city) => (
+              <option key={city} value={city}>
+                {city === "All" ? "All Cities" : city}
+              </option>
+            ))}
+          </select>
 
-                <div className="ml-2 flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
-                    {initials}
-                  </div>
-                  <div className="hidden sm:block">
-                    <p className="text-sm font-semibold text-slate-900">
-                      {user?.fullName || user?.name || "User"}
-                    </p>
-                    <p className="text-xs text-slate-500">{displayRole}</p>
-                    <p className="mt-1 truncate rounded-lg bg-black/20 px-2 py-1 text-[10px] font-mono text-emerald-200">
-                      Org: {user?.organizationId || "No organizationId"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </header>
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
+          >
+            {uniqueTypes.map((type) => (
+              <option key={type} value={type}>
+                {type === "All" ? "All Types" : type}
+              </option>
+            ))}
+          </select>
+        </div>
 
-          <div className="p-6 md:p-8">
-            {isSuperAdmin && (
-              <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-700">
-                <div className="flex items-start gap-3">
-                  <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />
-                  <div>
-                    <p className="font-semibold">Read-only Super Admin mode</p>
-                    <p className="mt-1">
-                      You can review all properties, but only Admin can add,
-                      edit, or delete properties.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
+        {error ? (
+          <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-red-600">
+            {error}
+          </div>
+        ) : loading ? (
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-8 text-center text-slate-500">
+            Loading properties...
+          </div>
+        ) : filteredAndSortedProperties.length === 0 ? (
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-8 text-center text-slate-500">
+            No properties found.
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="min-w-[1100px] border-separate border-spacing-y-3">
+                <thead>
+                  <tr className="text-left text-sm text-slate-500">
+                    <th className="px-4 py-2">
+                      <button
+                        type="button"
+                        onClick={() => handleSort("code")}
+                        className="font-medium hover:text-slate-900"
+                      >
+                        Code {renderSortIcon("code")}
+                      </button>
+                    </th>
 
-            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                <div>
-                  <h3 className="text-xl font-semibold text-slate-900">
-                    Properties List
-                  </h3>
-                  <p className="text-sm text-slate-500">
-                    All properties currently available in the system
-                  </p>
-                </div>
+                    <th className="px-4 py-2">Org ID</th>
 
-                <div className="rounded-xl bg-slate-100 px-4 py-2 text-sm text-slate-600">
-                  Total: {filteredAndSortedProperties.length}
-                </div>
-              </div>
+                    <th className="px-4 py-2">
+                      <button
+                        type="button"
+                        onClick={() => handleSort("name")}
+                        className="font-medium hover:text-slate-900"
+                      >
+                        Property Name {renderSortIcon("name")}
+                      </button>
+                    </th>
 
-              <div className="mb-6 grid grid-cols-1 gap-3 lg:grid-cols-4">
-                <div className="relative lg:col-span-2">
-                  <Search
-                    size={16}
-                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Search property, code, address, city..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full rounded-xl border border-slate-300 py-3 pl-10 pr-4 outline-none focus:border-blue-500"
-                  />
-                </div>
+                    <th className="px-4 py-2">
+                      <button
+                        type="button"
+                        onClick={() => handleSort("addressLine1")}
+                        className="font-medium hover:text-slate-900"
+                      >
+                        Address {renderSortIcon("addressLine1")}
+                      </button>
+                    </th>
 
-                <select
-                  value={cityFilter}
-                  onChange={(e) => setCityFilter(e.target.value)}
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
-                >
-                  {uniqueCities.map((city) => (
-                    <option key={city} value={city}>
-                      {city === "All" ? "All Cities" : city}
-                    </option>
-                  ))}
-                </select>
+                    <th className="px-4 py-2">City</th>
 
-                <select
-                  value={typeFilter}
-                  onChange={(e) => setTypeFilter(e.target.value)}
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
-                >
-                  {uniqueTypes.map((type) => (
-                    <option key={type} value={type}>
-                      {type === "All" ? "All Types" : type}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                    <th className="px-4 py-2">
+                      <button
+                        type="button"
+                        onClick={() => handleSort("propertyType")}
+                        className="font-medium hover:text-slate-900"
+                      >
+                        Type {renderSortIcon("propertyType")}
+                      </button>
+                    </th>
 
-              {error ? (
-                <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-red-600">
-                  {error}
-                </div>
-              ) : loading ? (
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-8 text-center text-slate-500">
-                  Loading properties...
-                </div>
-              ) : filteredAndSortedProperties.length === 0 ? (
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-8 text-center text-slate-500">
-                  No properties found.
-                </div>
-              ) : (
-                <>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full border-separate border-spacing-y-3">
-                      <thead>
-                        <tr className="text-left text-sm text-slate-500">
-                          <th className="px-4 py-2">
-                            <button
-                              type="button"
-                              onClick={() => handleSort("code")}
-                              className="font-medium hover:text-slate-900"
-                            >
-                              Code {renderSortIcon("code")}
-                            </button>
-                          </th>
-                          <th className="px-4 py-2">Org ID</th>
-                          <th className="px-4 py-2">
-                            <button
-                              type="button"
-                              onClick={() => handleSort("name")}
-                              className="font-medium hover:text-slate-900"
-                            >
-                              Property Name {renderSortIcon("name")}
-                            </button>
-                          </th>
-                          <th className="px-4 py-2">
-                            <button
-                              type="button"
-                              onClick={() => handleSort("addressLine1")}
-                              className="font-medium hover:text-slate-900"
-                            >
-                              Address {renderSortIcon("addressLine1")}
-                            </button>
-                          </th>
-                          <th className="px-4 py-2">City</th>
-                          <th className="px-4 py-2">
-                            <button
-                              type="button"
-                              onClick={() => handleSort("propertyType")}
-                              className="font-medium hover:text-slate-900"
-                            >
-                              Type {renderSortIcon("propertyType")}
-                            </button>
-                          </th>
-                          <th className="px-4 py-2">
-                            <button
-                              type="button"
-                              onClick={() => handleSort("monthlyRent")}
-                              className="font-medium hover:text-slate-900"
-                            >
-                              Price {renderSortIcon("monthlyRent")}
-                            </button>
-                          </th>
-                          <th className="px-4 py-2">
-                            <button
-                              type="button"
-                              onClick={() => handleSort("unitsCount")}
-                              className="font-medium hover:text-slate-900"
-                            >
-                              Units {renderSortIcon("unitsCount")}
-                            </button>
-                          </th>
-                          <th className="px-4 py-2">Status</th>
-                          <th className="px-4 py-2">Actions</th>
-                        </tr>
-                      </thead>
+                    <th className="px-4 py-2">
+                      <button
+                        type="button"
+                        onClick={() => handleSort("monthlyRent")}
+                        className="font-medium hover:text-slate-900"
+                      >
+                        Price {renderSortIcon("monthlyRent")}
+                      </button>
+                    </th>
 
-                      <tbody>
-                        {paginatedProperties.map((property) => (
-                          <tr
-                            key={property.id}
-                            onClick={() => handleRowClick(property.id)}
-                            className="cursor-pointer rounded-2xl bg-slate-50 shadow-sm transition hover:bg-slate-100"
-                          >
-                            
-                            <td className="rounded-l-2xl px-4 py-4 font-medium text-slate-700">
-                              {property.code}
-                            </td>
+                    <th className="px-4 py-2">
+                      <button
+                        type="button"
+                        onClick={() => handleSort("unitsCount")}
+                        className="font-medium hover:text-slate-900"
+                      >
+                        Units {renderSortIcon("unitsCount")}
+                      </button>
+                    </th>
 
-                            <td className="px-4 py-4 text-xs font-mono text-emerald-600">
-                                {property.organizationId || "-"}
-                            </td>
+                    <th className="px-4 py-2">Status</th>
+                    <th className="px-4 py-2">Actions</th>
+                  </tr>
+                </thead>
 
-                            <td className="px-4 py-4 font-semibold text-slate-900">
-                              {property.name}
-                            </td>
+                <tbody>
+                  {paginatedProperties.map((property) => (
+                    <tr
+                      key={property.id}
+                      onClick={() => handleRowClick(property.id)}
+                      className="cursor-pointer rounded-2xl bg-slate-50 shadow-sm transition hover:bg-slate-100"
+                    >
+                      <td className="rounded-l-2xl px-4 py-4 font-medium text-slate-700">
+                        {property.code}
+                      </td>
 
-                            <td className="px-4 py-4 text-slate-600">
-                              {property.addressLine1}
-                            </td>
+                      <td className="px-4 py-4 text-xs font-mono text-emerald-600">
+                        {property.organizationId || "-"}
+                      </td>
 
-                            <td className="px-4 py-4 text-slate-600">
-                              {property.city}
-                            </td>
+                      <td className="px-4 py-4 font-semibold text-slate-900">
+                        {property.name || "-"}
+                      </td>
 
-                            <td className="px-4 py-4 text-slate-600">
-                              {property.propertyType}
-                            </td>
+                      <td className="px-4 py-4 text-slate-600">
+                        {property.addressLine1}
+                      </td>
 
-                            <td className="px-4 py-4 text-slate-600">
-                              {property.monthlyRent != null
-                                ? `$${Number(property.monthlyRent).toLocaleString()}`
-                                : "-"}
-                            </td>
+                      <td className="px-4 py-4 text-slate-600">
+                        {property.city || "-"}
+                      </td>
 
-                            <td className="px-4 py-4 text-slate-600">
-                              {property.unitsCount}
-                            </td>
+                      <td className="px-4 py-4 text-slate-600">
+                        {property.propertyType}
+                      </td>
 
-                            <td className="px-4 py-4">
-                              <span
-                                className={`rounded-full px-3 py-1 text-xs font-medium ${
-                                  property.isActive
-                                    ? "bg-emerald-100 text-emerald-700"
-                                    : "bg-slate-200 text-slate-700"
-                                }`}
+                      <td className="px-4 py-4 text-slate-600">
+                        {property.monthlyRent != null
+                          ? `$${Number(property.monthlyRent).toLocaleString()}`
+                          : "-"}
+                      </td>
+
+                      <td className="px-4 py-4 text-slate-600">
+                        {property.unitsCount}
+                      </td>
+
+                      <td className="px-4 py-4">
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-medium ${
+                            property.isActive
+                              ? "bg-emerald-100 text-emerald-700"
+                              : "bg-slate-200 text-slate-700"
+                          }`}
+                        >
+                          {property.isActive ? "Active" : "Inactive"}
+                        </span>
+                      </td>
+
+                      <td className="rounded-r-2xl px-4 py-4">
+                        <div className="flex items-center gap-2">
+                          {canEdit ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={(
+                                  e: MouseEvent<HTMLButtonElement>
+                                ) => {
+                                  e.stopPropagation();
+                                  openEditModal(property);
+                                }}
+                                className="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-100"
+                                title="Edit property"
                               >
-                                {property.isActive ? "Active" : "Inactive"}
-                              </span>
-                            </td>
+                                <Pencil size={16} />
+                              </button>
 
-                            <td className="rounded-r-2xl px-4 py-4">
-                              <div className="flex items-center gap-2">
-                                {canEdit ? (
-                                  <>
-                                    <button
-                                      type="button"
-                                      onClick={(e: MouseEvent<HTMLButtonElement>) => {
-                                        e.stopPropagation();
-                                        openEditModal(property);
-                                      }}
-                                      className="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-100"
-                                      title="Edit property"
-                                    >
-                                      <Pencil size={16} />
-                                    </button>
-
-                                    <button
-                                      type="button"
-                                      onClick={(e: MouseEvent<HTMLButtonElement>) => {
-                                        e.stopPropagation();
-                                        setDeleteId(property.id);
-                                      }}
-                                      className="rounded-xl border border-red-200 bg-white p-2 text-red-500 hover:bg-red-50"
-                                      title="Delete property"
-                                    >
-                                      <Trash2 size={16} />
-                                    </button>
-                                  </>
-                                ) : (
-                                  <span className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-500">
-                                    Read only
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <div className="mt-6 flex flex-col gap-4 border-t border-slate-200 pt-4 md:flex-row md:items-center md:justify-between">
-                    <p className="text-sm text-slate-500">
-                      Showing {startItem} to {endItem} of{" "}
-                      {filteredAndSortedProperties.length} properties
-                    </p>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setCurrentPage((prev) => Math.max(1, prev - 1))
-                        }
-                        disabled={currentPage === 1}
-                        className="inline-flex items-center gap-1 rounded-xl border border-slate-300 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <ChevronLeft size={16} />
-                        Prev
-                      </button>
-
-                      <span className="px-2 text-sm text-slate-700">
-                        Page {currentPage} / {totalPages}
-                      </span>
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setCurrentPage((prev) =>
-                            Math.min(totalPages, prev + 1)
-                          )
-                        }
-                        disabled={currentPage === totalPages}
-                        className="inline-flex items-center gap-1 rounded-xl border border-slate-300 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        Next
-                        <ChevronRight size={16} />
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )}
+                              <button
+                                type="button"
+                                onClick={(
+                                  e: MouseEvent<HTMLButtonElement>
+                                ) => {
+                                  e.stopPropagation();
+                                  setDeleteId(property.id);
+                                }}
+                                className="rounded-xl border border-red-200 bg-white p-2 text-red-500 hover:bg-red-50"
+                                title="Delete property"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </>
+                          ) : (
+                            <span className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-500">
+                              Read only
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </div>
 
-          <footer className="mt-8 border-t border-slate-200 bg-white px-6 py-4 md:px-8">
-            <div className="flex flex-col gap-2 text-sm text-slate-500 md:flex-row md:items-center md:justify-between">
-              <p>© 2026 PropertyOS. All rights reserved.</p>
-              <p>Built for smart property management.</p>
+            <div className="mt-6 flex flex-col gap-4 border-t border-slate-200 pt-4 md:flex-row md:items-center md:justify-between">
+              <p className="text-sm text-slate-500">
+                Showing {startItem} to {endItem} of{" "}
+                {filteredAndSortedProperties.length} properties
+              </p>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.max(1, prev - 1))
+                  }
+                  disabled={currentPage === 1}
+                  className="inline-flex items-center gap-1 rounded-xl border border-slate-300 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <ChevronLeft size={16} />
+                  Prev
+                </button>
+
+                <span className="px-2 text-sm text-slate-700">
+                  Page {currentPage} / {totalPages}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+                  }
+                  disabled={currentPage === totalPages}
+                  className="inline-flex items-center gap-1 rounded-xl border border-slate-300 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Next
+                  <ChevronRight size={16} />
+                </button>
+              </div>
             </div>
-          </footer>
-        </main>
+          </>
+        )}
       </div>
 
       {showAddModal && canEdit && (
@@ -1109,7 +935,7 @@ export default function PropertiesPage() {
 
           <div className="absolute inset-y-0 right-0 flex w-full justify-end">
             <div className="flex h-full w-full max-w-3xl flex-col border border-white/40 bg-white/90 shadow-2xl backdrop-blur-xl">
-              <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
+              <div className="flex items-center justify-between border-b border-slate-200 px-5 py-5 sm:px-6">
                 <div>
                   <h3 className="text-2xl font-bold text-slate-900">
                     {editingPropertyId ? "Edit Property" : "Add New Property"}
@@ -1128,7 +954,7 @@ export default function PropertiesPage() {
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto px-6 py-6">
+              <div className="flex-1 overflow-y-auto px-5 py-6 sm:px-6">
                 <form
                   id="property-form"
                   onSubmit={handleSaveProperty}
@@ -1198,11 +1024,13 @@ export default function PropertiesPage() {
                     </select>
                   </div>
 
-                  <div className="md:col-span-2 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">
-                    <span className="font-semibold">Property Code Preview:</span>{" "}
+                  <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700 md:col-span-2">
+                    <span className="font-semibold">
+                      Property Code Preview:
+                    </span>{" "}
                     {editingPropertyId
-                      ? properties.find((p) => p.id === editingPropertyId)?.code ||
-                        "Will keep existing code"
+                      ? properties.find((p) => p.id === editingPropertyId)
+                          ?.code || "Will keep existing code"
                       : generatePropertyCode(
                           formData.propertyType,
                           formData.city || "CITY",
@@ -1270,7 +1098,7 @@ export default function PropertiesPage() {
 
                   <div>
                     <label className="mb-1 block text-sm font-medium text-slate-700">
-                      Area (sqm)
+                      Area sqm
                     </label>
                     <input
                       type="number"
@@ -1375,7 +1203,7 @@ export default function PropertiesPage() {
                 </form>
               </div>
 
-              <div className="flex items-center justify-end gap-3 border-t border-slate-200 bg-white px-6 py-4">
+              <div className="flex items-center justify-end gap-3 border-t border-slate-200 bg-white px-5 py-4 sm:px-6">
                 <button
                   type="button"
                   onClick={closeModal}
@@ -1435,33 +1263,6 @@ export default function PropertiesPage() {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function SidebarItem({
-  label,
-  icon,
-  href,
-  active = false,
-}: {
-  label: string;
-  icon: ReactNode;
-  href: string;
-  active?: boolean;
-}) {
-  return (
-    <Link href={href}>
-      <div
-        className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-medium transition ${
-          active
-            ? "bg-white/15 text-white shadow"
-            : "text-blue-100/80 hover:bg-white/10 hover:text-white"
-        }`}
-      >
-        <span>{icon}</span>
-        <span>{label}</span>
-      </div>
-    </Link>
+    </AdminShell>
   );
 }

@@ -18,6 +18,7 @@ import {
   Eye,
   Pencil,
   Trash2,
+  ShieldCheck,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -87,6 +88,7 @@ function formatMoney(value?: number | string | null) {
   if (value === null || value === undefined || value === "") return "$0";
   const amount = Number(value);
   if (Number.isNaN(amount)) return `$${value}`;
+
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
@@ -145,6 +147,10 @@ export default function VendorsPage() {
     if (checkingAuth) return;
     fetchVendors();
   }, [checkingAuth]);
+
+  const normalizedRole = String(user?.role || "").trim().toUpperCase();
+  const isSuperAdmin = normalizedRole === "OWNER";
+  const canEdit = normalizedRole === "ADMIN";
 
   async function fetchVendors() {
     try {
@@ -205,6 +211,7 @@ export default function VendorsPage() {
   }, [vendors, search]);
 
   function openCreateModal() {
+    if (!canEdit) return;
     setForm(initialForm);
     setFormError("");
     setModalOpen(true);
@@ -217,7 +224,9 @@ export default function VendorsPage() {
   }
 
   function handleChange(
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >
   ) {
     const target = e.target;
     const { name, value } = target;
@@ -235,6 +244,8 @@ export default function VendorsPage() {
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+
+    if (!canEdit) return;
 
     if (!form.companyName.trim()) {
       setFormError("Company name is required.");
@@ -295,7 +306,7 @@ export default function VendorsPage() {
   }
 
   async function handleDeleteConfirm() {
-    if (!deleteVendor) return;
+    if (!deleteVendor || !canEdit) return;
 
     try {
       setDeleting(true);
@@ -348,18 +359,33 @@ export default function VendorsPage() {
       title="Vendors"
       subtitle="Manage contractors and service providers"
       actions={
-        <button
-          onClick={openCreateModal}
-          className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-blue-700"
-        >
-          <span className="inline-flex items-center gap-2">
+        canEdit ? (
+          <button
+            onClick={openCreateModal}
+            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-blue-700"
+          >
             <Plus size={16} />
             Add Vendor
-          </span>
-        </button>
+          </button>
+        ) : null
       }
     >
       <div className="space-y-6">
+        {isSuperAdmin && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-700">
+            <div className="flex items-start gap-3">
+              <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />
+              <div>
+                <p className="font-semibold">Read-only Super Admin mode</p>
+                <p className="mt-1">
+                  You can review all vendors, but only Admin can add, edit, or
+                  delete vendors.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="relative">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -389,15 +415,15 @@ export default function VendorsPage() {
             No vendors yet
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
             {filtered.map((v) => (
               <div
                 key={v.id}
                 className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="text-lg font-semibold text-slate-900">
+                  <div className="min-w-0">
+                    <h3 className="truncate text-lg font-semibold text-slate-900">
                       {v.companyName}
                     </h3>
                     <p className="mt-1 text-sm text-slate-500">
@@ -406,7 +432,7 @@ export default function VendorsPage() {
                   </div>
 
                   <span
-                    className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                    className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
                       v.isActive
                         ? "bg-emerald-100 text-emerald-700"
                         : "bg-slate-100 text-slate-600"
@@ -417,15 +443,27 @@ export default function VendorsPage() {
                 </div>
 
                 <div className="mt-4 space-y-2 text-sm text-slate-700">
-                  <p>📍 {v.city || "—"}</p>
-                  <p>📞 {v.phone || "—"}</p>
-                  <p>👤 {v.contactPerson || "—"}</p>
-                  <p>💼 {v.specialties || "—"}</p>
+                  <p className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-slate-400" />
+                    {v.city || "—"}
+                  </p>
+                  <p className="flex items-center gap-2">
+                    <Phone className="h-4 w-4 text-slate-400" />
+                    {v.phone || "—"}
+                  </p>
+                  <p className="flex items-center gap-2">
+                    <User className="h-4 w-4 text-slate-400" />
+                    {v.contactPerson || "—"}
+                  </p>
+                  <p className="flex items-center gap-2">
+                    <Briefcase className="h-4 w-4 text-slate-400" />
+                    {v.specialties || "—"}
+                  </p>
                 </div>
 
-                <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4 text-sm text-slate-700">
-                  <span>💲 Base: {formatMoney(v.baseFee)}</span>
-                  <span>⏱ {formatMoney(v.hourlyRate)}/h</span>
+                <div className="mt-5 flex flex-col gap-2 border-t border-slate-100 pt-4 text-sm text-slate-700 sm:flex-row sm:items-center sm:justify-between">
+                  <span>Base: {formatMoney(v.baseFee)}</span>
+                  <span>{formatMoney(v.hourlyRate)}/h</span>
                 </div>
 
                 <div className="mt-5 flex flex-wrap gap-2">
@@ -437,22 +475,30 @@ export default function VendorsPage() {
                     View
                   </Link>
 
-                  <Link
-                    href={`/vendors/edit/${v.id}`}
-                    className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100"
-                  >
-                    <Pencil className="h-4 w-4" />
-                    Edit
-                  </Link>
+                  {canEdit ? (
+                    <>
+                      <Link
+                        href={`/vendors/edit/${v.id}`}
+                        className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100"
+                      >
+                        <Pencil className="h-4 w-4" />
+                        Edit
+                      </Link>
 
-                  <button
-                    type="button"
-                    onClick={() => setDeleteVendor(v)}
-                    className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Delete
-                  </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeleteVendor(v)}
+                        className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Delete
+                      </button>
+                    </>
+                  ) : (
+                    <span className="inline-flex rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-500">
+                      Read only
+                    </span>
+                  )}
                 </div>
               </div>
             ))}
@@ -460,18 +506,21 @@ export default function VendorsPage() {
         )}
       </div>
 
-      {modalOpen && (
+      {modalOpen && canEdit && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 px-4 py-6">
-          <div className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-5">
+          <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4 sm:px-6 sm:py-5">
               <div>
-                <h3 className="text-2xl font-bold text-slate-900">Add Vendor</h3>
+                <h3 className="text-xl font-bold text-slate-900 sm:text-2xl">
+                  Add Vendor
+                </h3>
                 <p className="mt-1 text-sm text-slate-500">
                   Register a contractor or service provider
                 </p>
               </div>
 
               <button
+                type="button"
                 onClick={closeCreateModal}
                 className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
               >
@@ -479,7 +528,7 @@ export default function VendorsPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="overflow-y-auto p-6">
+            <form onSubmit={handleSubmit} className="overflow-y-auto p-5 sm:p-6">
               {formError && (
                 <div className="mb-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                   {formError}
@@ -487,62 +536,42 @@ export default function VendorsPage() {
               )}
 
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                <div>
-                  <label className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-700">
-                    <Building2 className="h-4 w-4" />
-                    Company Name
-                  </label>
-                  <input
-                    name="companyName"
-                    value={form.companyName}
-                    onChange={handleChange}
-                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500"
-                    placeholder="Goma Plumbing Services"
-                  />
-                </div>
+                <FormInput
+                  icon={<Building2 className="h-4 w-4" />}
+                  label="Company Name"
+                  name="companyName"
+                  value={form.companyName}
+                  onChange={handleChange}
+                  placeholder="Goma Plumbing Services"
+                />
 
-                <div>
-                  <label className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-700">
-                    <User className="h-4 w-4" />
-                    Contact Person
-                  </label>
-                  <input
-                    name="contactPerson"
-                    value={form.contactPerson}
-                    onChange={handleChange}
-                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500"
-                    placeholder="Jean Bosco"
-                  />
-                </div>
+                <FormInput
+                  icon={<User className="h-4 w-4" />}
+                  label="Contact Person"
+                  name="contactPerson"
+                  value={form.contactPerson}
+                  onChange={handleChange}
+                  placeholder="Jean Bosco"
+                />
 
-                <div>
-                  <label className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-700">
-                    <Mail className="h-4 w-4" />
-                    Email
-                  </label>
-                  <input
-                    name="email"
-                    type="email"
-                    value={form.email}
-                    onChange={handleChange}
-                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500"
-                    placeholder="vendor@example.com"
-                  />
-                </div>
+                <FormInput
+                  icon={<Mail className="h-4 w-4" />}
+                  label="Email"
+                  name="email"
+                  type="email"
+                  value={form.email}
+                  onChange={handleChange}
+                  placeholder="vendor@example.com"
+                />
 
-                <div>
-                  <label className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-700">
-                    <Phone className="h-4 w-4" />
-                    Phone
-                  </label>
-                  <input
-                    name="phone"
-                    value={form.phone}
-                    onChange={handleChange}
-                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500"
-                    placeholder="+243..."
-                  />
-                </div>
+                <FormInput
+                  icon={<Phone className="h-4 w-4" />}
+                  label="Phone"
+                  name="phone"
+                  value={form.phone}
+                  onChange={handleChange}
+                  placeholder="+243..."
+                />
 
                 <div>
                   <label className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-700">
@@ -562,7 +591,9 @@ export default function VendorsPage() {
                     <option value="PAINTING">PAINTING</option>
                     <option value="PEST_CONTROL">PEST CONTROL</option>
                     <option value="APPLIANCE">APPLIANCE</option>
-                    <option value="GENERAL_MAINTENANCE">GENERAL MAINTENANCE</option>
+                    <option value="GENERAL_MAINTENANCE">
+                      GENERAL MAINTENANCE
+                    </option>
                     <option value="CLEANING">CLEANING</option>
                     <option value="SECURITY">SECURITY</option>
                     <option value="LANDSCAPING">LANDSCAPING</option>
@@ -570,97 +601,67 @@ export default function VendorsPage() {
                   </select>
                 </div>
 
-                <div>
-                  <label className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-700">
-                    <Wrench className="h-4 w-4" />
-                    Specialties
-                  </label>
-                  <input
-                    name="specialties"
-                    value={form.specialties}
-                    onChange={handleChange}
-                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500"
-                    placeholder="Pipe repair, bathroom installation..."
-                  />
-                </div>
+                <FormInput
+                  icon={<Wrench className="h-4 w-4" />}
+                  label="Specialties"
+                  name="specialties"
+                  value={form.specialties}
+                  onChange={handleChange}
+                  placeholder="Pipe repair, bathroom installation..."
+                />
 
-                <div>
-                  <label className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-700">
-                    <MapPin className="h-4 w-4" />
-                    Address
-                  </label>
-                  <input
-                    name="address"
-                    value={form.address}
-                    onChange={handleChange}
-                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500"
-                    placeholder="Avenue du Lac 15"
-                  />
-                </div>
+                <FormInput
+                  icon={<MapPin className="h-4 w-4" />}
+                  label="Address"
+                  name="address"
+                  value={form.address}
+                  onChange={handleChange}
+                  placeholder="Avenue du Lac 15"
+                />
 
-                <div>
-                  <label className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-700">
-                    <MapPin className="h-4 w-4" />
-                    City
-                  </label>
-                  <input
-                    name="city"
-                    value={form.city}
-                    onChange={handleChange}
-                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500"
-                    placeholder="Goma"
-                  />
-                </div>
+                <FormInput
+                  icon={<MapPin className="h-4 w-4" />}
+                  label="City"
+                  name="city"
+                  value={form.city}
+                  onChange={handleChange}
+                  placeholder="Goma"
+                />
 
-                <div>
-                  <label className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-700">
-                    <BadgeDollarSign className="h-4 w-4" />
-                    Base Fee
-                  </label>
-                  <input
-                    name="baseFee"
-                    type="number"
-                    step="0.01"
-                    value={form.baseFee}
-                    onChange={handleChange}
-                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500"
-                    placeholder="25"
-                  />
-                </div>
+                <FormInput
+                  icon={<BadgeDollarSign className="h-4 w-4" />}
+                  label="Base Fee"
+                  name="baseFee"
+                  type="number"
+                  step="0.01"
+                  value={form.baseFee}
+                  onChange={handleChange}
+                  placeholder="25"
+                />
 
-                <div>
-                  <label className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-700">
-                    <BadgeDollarSign className="h-4 w-4" />
-                    Hourly Rate
-                  </label>
-                  <input
-                    name="hourlyRate"
-                    type="number"
-                    step="0.01"
-                    value={form.hourlyRate}
-                    onChange={handleChange}
-                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500"
-                    placeholder="15"
-                  />
-                </div>
+                <FormInput
+                  icon={<BadgeDollarSign className="h-4 w-4" />}
+                  label="Hourly Rate"
+                  name="hourlyRate"
+                  type="number"
+                  step="0.01"
+                  value={form.hourlyRate}
+                  onChange={handleChange}
+                  placeholder="15"
+                />
 
-                <div>
-                  <label className="mb-2 text-sm font-medium text-slate-700">
-                    Rating
-                  </label>
-                  <input
-                    name="rating"
-                    type="number"
-                    step="0.1"
-                    value={form.rating}
-                    onChange={handleChange}
-                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500"
-                    placeholder="4.5"
-                  />
-                </div>
+                <FormInput
+                  label="Rating"
+                  name="rating"
+                  type="number"
+                  step="0.1"
+                  value={form.rating}
+                  onChange={handleChange}
+                  placeholder="4.5"
+                />
 
                 <div className="flex items-end">
-                  <label className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                  <label className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
                     <input
                       type="checkbox"
                       name="isActive"
@@ -687,7 +688,7 @@ export default function VendorsPage() {
                 </div>
               </div>
 
-              <div className="mt-6 flex justify-end gap-3">
+              <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                 <button
                   type="button"
                   onClick={closeCreateModal}
@@ -719,7 +720,7 @@ export default function VendorsPage() {
         </div>
       )}
 
-      {deleteVendor && (
+      {deleteVendor && canEdit && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/50 px-4">
           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
             <h3 className="text-xl font-bold text-slate-900">Delete Vendor</h3>
@@ -753,5 +754,43 @@ export default function VendorsPage() {
         </div>
       )}
     </AdminShell>
+  );
+}
+
+function FormInput({
+  label,
+  icon,
+  name,
+  value,
+  onChange,
+  placeholder,
+  type = "text",
+  step,
+}: {
+  label: string;
+  icon?: React.ReactNode;
+  name: string;
+  value: string;
+  onChange: React.ChangeEventHandler<HTMLInputElement>;
+  placeholder?: string;
+  type?: string;
+  step?: string;
+}) {
+  return (
+    <div>
+      <label className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-700">
+        {icon}
+        {label}
+      </label>
+      <input
+        name={name}
+        type={type}
+        step={step}
+        value={value}
+        onChange={onChange}
+        className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500"
+        placeholder={placeholder}
+      />
+    </div>
   );
 }

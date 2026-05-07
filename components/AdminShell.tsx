@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import type { ReactNode } from "react";
+import { ReactNode, useState } from "react";
 import {
   LayoutDashboard,
   Building2,
@@ -10,10 +9,13 @@ import {
   Wrench,
   Wallet,
   FileText,
+  MessageCircle,
   Brain,
   Settings,
   LogOut,
   Home,
+  Menu,
+  X,
 } from "lucide-react";
 
 type StoredUser = {
@@ -22,36 +24,107 @@ type StoredUser = {
   name?: string;
   email?: string;
   role?: string;
+  organizationId?: string;
 };
 
 type AdminShellProps = {
-  children: ReactNode;
   user: StoredUser | null;
-  activeItem?:
+  activeItem:
     | "dashboard"
     | "properties"
-    | "tenants"
     | "units"
+    | "tenants"
     | "vendors"
     | "maintenance"
     | "payments"
+    | "communications"
     | "documents"
     | "insights"
     | "settings";
-  title?: string;
+  title: string;
   subtitle?: string;
   actions?: ReactNode;
+  children: ReactNode;
 };
 
+const menuItems = [
+  {
+    key: "dashboard",
+    label: "Dashboard",
+    href: "/dashboard",
+    icon: <LayoutDashboard size={18} />,
+  },
+  {
+    key: "properties",
+    label: "Properties",
+    href: "/properties",
+    icon: <Building2 size={18} />,
+  },
+  {
+    key: "units",
+    label: "Units",
+    href: "/units",
+    icon: <Home size={18} />,
+  },
+  {
+    key: "tenants",
+    label: "Tenants",
+    href: "/tenants",
+    icon: <Users size={18} />,
+  },
+  {
+    key: "vendors",
+    label: "Vendors",
+    href: "/vendors",
+    icon: <Wrench size={18} />,
+  },
+  {
+    key: "maintenance",
+    label: "Maintenance",
+    href: "/maintenance",
+    icon: <Wrench size={18} />,
+  },
+  {
+    key: "payments",
+    label: "Financials",
+    href: "/payments",
+    icon: <Wallet size={18} />,
+  },
+  {
+    key: "communications",
+    label: "Messages",
+    href: "/communications",
+    icon: <MessageCircle size={18} />,
+  },
+  {
+    key: "documents",
+    label: "Documents",
+    href: "/documents",
+    icon: <FileText size={18} />,
+  },
+  {
+    key: "insights",
+    label: "AI Insights",
+    href: "/insights",
+    icon: <Brain size={18} />,
+  },
+  {
+    key: "settings",
+    label: "Settings",
+    href: "/settings",
+    icon: <Settings size={18} />,
+  },
+];
+
 export default function AdminShell({
-  children,
   user,
-  activeItem = "dashboard",
+  activeItem,
   title,
   subtitle,
   actions,
+  children,
 }: AdminShellProps) {
-  const router = useRouter();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const normalizedRole = String(user?.role || "").trim().toUpperCase();
 
@@ -70,174 +143,156 @@ export default function AdminShell({
       .slice(0, 2)
       .toUpperCase() || "US";
 
-  const handleLogout = () => {
+  function handleLogout() {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
-    router.replace("/");
-  };
+    window.location.href = "/";
+  }
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900">
-      <div className="flex min-h-screen">
-        <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 bg-gradient-to-b from-blue-950 via-blue-900 to-slate-900 text-white shadow-2xl lg:flex lg:flex-col">
-          <div className="border-b border-white/10 px-6 py-7">
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-slate-900/50 lg:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col bg-gradient-to-b from-blue-950 via-blue-900 to-slate-900 text-white shadow-2xl transition-transform duration-300 lg:translate-x-0 ${
+          mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div className="flex items-center justify-between border-b border-white/10 px-6 py-7">
+          <div>
             <h1 className="text-3xl font-bold tracking-tight">
               <span className="text-white">The House</span>{" "}
               <span className="text-emerald-400">Hub</span>
             </h1>
-
             <p className="mt-2 text-xs text-blue-100/60">
               Smart Property Management
             </p>
           </div>
 
-          <nav className="flex-1 overflow-y-auto px-4 py-6">
-            <p className="mb-3 px-3 text-xs font-semibold uppercase tracking-widest text-blue-200/50">
-              Main Menu
-            </p>
+          <button
+            onClick={() => setMobileMenuOpen(false)}
+            className="rounded-xl bg-white/10 p-2 text-white lg:hidden"
+          >
+            <X size={20} />
+          </button>
+        </div>
 
-            <div className="space-y-2">
-              <SidebarItem
-                label="Dashboard"
-                icon={<LayoutDashboard size={18} />}
-                href="/dashboard"
-                active={activeItem === "dashboard"}
-              />
-              <SidebarItem
-                label="Properties"
-                icon={<Building2 size={18} />}
-                href="/properties"
-                active={activeItem === "properties"}
-              />
-              <SidebarItem
-                label="Tenants"
-                icon={<Users size={18} />}
-                href="/tenants"
-                active={activeItem === "tenants"}
-              />
-              <SidebarItem
-                label="Units"
-                icon={<Home size={18} />}
-                href="/units"
-                active={activeItem === "units"}
-              />
-              <SidebarItem
-                label="Vendors"
-                icon={<Wrench size={18} />}
-                href="/vendors"
-                active={activeItem === "vendors"}
-              />
-              <SidebarItem
-                label="Maintenance"
-                icon={<Wrench size={18} />}
-                href="/maintenance"
-                active={activeItem === "maintenance"}
-              />
-              <SidebarItem
-                label="Financials"
-                icon={<Wallet size={18} />}
-                href="/payments"
-                active={activeItem === "payments"}
-              />
-              <SidebarItem
-                label="Documents"
-                icon={<FileText size={18} />}
-                href="/documents"
-                active={activeItem === "documents"}
-              />
-              <SidebarItem
-                label="AI Insights"
-                icon={<Brain size={18} />}
-                href="/insights"
-                active={activeItem === "insights"}
-              />
-              <SidebarItem
-                label="Settings"
-                icon={<Settings size={18} />}
-                href="/settings"
-                active={activeItem === "settings"}
-              />
-            </div>
-          </nav>
+        <nav className="flex-1 overflow-y-auto px-4 py-6">
+          <p className="mb-3 px-3 text-xs font-semibold uppercase tracking-widest text-blue-200/50">
+            Main Menu
+          </p>
 
-          <div className="border-t border-white/10 px-6 py-5">
-            <p className="text-xs uppercase tracking-widest text-blue-200/50">
-              Current Role
-            </p>
-            <p className="mt-2 font-semibold">{displayRole}</p>
-
-            <div className="mt-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/10 px-3 py-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-500 text-sm font-bold text-white">
-                {initials}
-              </div>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-white">
-                  {user?.fullName || user?.name || "User"}
-                </p>
-                <p className="truncate text-xs text-blue-100/80">
-                  {user?.email || displayRole}
-                </p>
-              </div>
-            </div>
-
-            <button
-              onClick={handleLogout}
-              className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-200 transition hover:bg-red-500/20 hover:text-white"
-            >
-              <LogOut size={16} />
-              Logout
-            </button>
+          <div className="space-y-2">
+            {menuItems.map((item) => (
+              <Link
+                key={item.key}
+                href={item.href}
+                onClick={() => setMobileMenuOpen(false)}
+                className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-medium transition ${
+                  activeItem === item.key
+                    ? "bg-white/15 text-white shadow"
+                    : "text-blue-100/80 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                <span>{item.icon}</span>
+                <span>{item.label}</span>
+              </Link>
+            ))}
           </div>
-        </aside>
+        </nav>
 
-        <main className="flex-1 lg:ml-72">
-          {(title || subtitle || actions) && (
-            <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
-              <div className="flex flex-col gap-5 px-6 py-5 md:flex-row md:items-center md:justify-between md:px-8">
-                <div>
-                  {title && (
-                    <h2 className="text-3xl font-bold tracking-tight text-slate-900">
-                      {title}
-                    </h2>
-                  )}
-                  {subtitle && <p className="mt-1 text-slate-500">{subtitle}</p>}
+        <div className="border-t border-white/10 px-6 py-5">
+          <p className="text-xs uppercase tracking-widest text-blue-200/50">
+            Current Role
+          </p>
+          <p className="mt-1 text-sm text-blue-100">{displayRole}</p>
+
+          <div className="mt-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/10 px-3 py-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-500 text-sm font-bold text-white">
+              {initials}
+            </div>
+
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-white">
+                {user?.fullName || user?.name || "User"}
+              </p>
+              <p className="text-xs text-blue-100/80">{displayRole}</p>
+              <p className="mt-1 truncate rounded-lg bg-black/20 px-2 py-1 text-[10px] font-mono text-emerald-200">
+                Org: {user?.organizationId || "No organizationId"}
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={handleLogout}
+            className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-200 transition hover:bg-red-500/20 hover:text-white"
+          >
+            <LogOut size={16} />
+            Logout
+          </button>
+        </div>
+      </aside>
+
+      <main className="min-h-screen lg:ml-72">
+        <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur">
+          <div className="flex flex-col gap-4 px-4 py-4 sm:px-6 md:px-8 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-start gap-3">
+              <button
+                onClick={() => setMobileMenuOpen(true)}
+                className="mt-1 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm lg:hidden"
+              >
+                <Menu size={20} />
+              </button>
+
+              <div>
+                <h2 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+                  {title}
+                </h2>
+
+                {subtitle && (
+                  <p className="mt-1 text-sm text-slate-500 sm:text-base">
+                    {subtitle}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              {actions}
+
+              <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
+                  {initials}
                 </div>
 
-                {actions ? <div className="flex items-center gap-3">{actions}</div> : null}
+                <div className="hidden sm:block">
+                  <p className="text-sm font-semibold text-slate-900">
+                    {user?.fullName || user?.name || "User"}
+                  </p>
+                  <p className="text-xs text-slate-500">{displayRole}</p>
+                  <p className="max-w-[180px] truncate text-[10px] font-mono text-emerald-600">
+                    Org: {user?.organizationId || "No organizationId"}
+                  </p>
+                </div>
               </div>
-            </header>
-          )}
+            </div>
+          </div>
+        </header>
 
-          <div className="p-6 md:p-8">{children}</div>
-        </main>
-      </div>
+        <div className="p-4 sm:p-6 md:p-8">{children}</div>
+
+        <footer className="mt-8 border-t border-slate-200 bg-white px-4 py-4 sm:px-6 md:px-8">
+          <div className="flex flex-col gap-2 text-sm text-slate-500 md:flex-row md:items-center md:justify-between">
+            <p>© 2026 The House Hub. All rights reserved.</p>
+            <p>Built for Smart Property Management.</p>
+          </div>
+        </footer>
+      </main>
     </div>
-  );
-}
-
-function SidebarItem({
-  label,
-  icon,
-  href,
-  active = false,
-}: {
-  label: string;
-  icon: ReactNode;
-  href: string;
-  active?: boolean;
-}) {
-  return (
-    <Link href={href}>
-      <div
-        className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-medium transition ${
-          active
-            ? "bg-white/15 text-white shadow"
-            : "text-blue-100/80 hover:bg-white/10 hover:text-white"
-        }`}
-      >
-        <span>{icon}</span>
-        <span>{label}</span>
-      </div>
-    </Link>
   );
 }

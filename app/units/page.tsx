@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft,
   Building2,
   DoorOpen,
   Home,
@@ -16,16 +15,9 @@ import {
   Plus,
   RefreshCw,
   Loader2,
-  LayoutDashboard,
-  Users,
-  Wallet,
-  FileText,
-  Brain,
-  Settings,
-  LogOut,
   ShieldCheck,
-  Wrench,
 } from "lucide-react";
+import AdminShell from "@/components/AdminShell";
 
 type StoredUser = {
   id?: string;
@@ -70,8 +62,7 @@ type UnitStats = {
   inactive: number;
 };
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 export default function UnitsPage() {
   const router = useRouter();
@@ -146,17 +137,15 @@ export default function UnitsPage() {
 
       const token = localStorage.getItem("token");
 
-      console.log("UNITS API_BASE USED:", API_BASE);
-
       const res = await fetch(
-  `${API_BASE}/api/units${queryString ? `?${queryString}` : ""}`,
-  {
-    cache: "no-store",
-    headers: {
-      Authorization: `Bearer ${token || ""}`,
-    },
-  }
-);
+        `${API_BASE}/api/units${queryString ? `?${queryString}` : ""}`,
+        {
+          cache: "no-store",
+          headers: {
+            Authorization: `Bearer ${token || ""}`,
+          },
+        }
+      );
 
       if (res.status === 401) {
         localStorage.removeItem("token");
@@ -165,14 +154,12 @@ export default function UnitsPage() {
         return;
       }
 
+      const data = await res.json().catch(() => null);
+
       if (!res.ok) {
-        const data = await res.json().catch(() => null);
         throw new Error(data?.error || "Failed to fetch units");
       }
 
-      const data = await res.json();
-
-      console.log("UNITS DATA:", data);
       setUnits(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
@@ -189,11 +176,11 @@ export default function UnitsPage() {
       const token = localStorage.getItem("token");
 
       const res = await fetch(`${API_BASE}/api/units/stats`, {
-  cache: "no-store",
-  headers: {
-    Authorization: `Bearer ${token || ""}`,
-  },
-});
+        cache: "no-store",
+        headers: {
+          Authorization: `Bearer ${token || ""}`,
+        },
+      });
 
       if (res.status === 401) {
         localStorage.removeItem("token");
@@ -202,12 +189,12 @@ export default function UnitsPage() {
         return;
       }
 
+      const data = await res.json().catch(() => null);
+
       if (!res.ok) {
-        const data = await res.json().catch(() => null);
         throw new Error(data?.error || "Failed to fetch unit stats");
       }
 
-      const data = await res.json();
       setStats(data);
     } catch (err) {
       console.error(err);
@@ -217,15 +204,11 @@ export default function UnitsPage() {
   };
 
   useEffect(() => {
-    if (!checkingAuth) {
-      fetchUnits();
-    }
+    if (!checkingAuth) fetchUnits();
   }, [checkingAuth, queryString]);
 
   useEffect(() => {
-    if (!checkingAuth) {
-      fetchStats();
-    }
+    if (!checkingAuth) fetchStats();
   }, [checkingAuth]);
 
   const refreshAll = async () => {
@@ -247,11 +230,11 @@ export default function UnitsPage() {
       const token = localStorage.getItem("token");
 
       const res = await fetch(`${API_BASE}/api/units/${selectedUnit.id}`, {
-  method: "DELETE",
-  headers: {
-    Authorization: `Bearer ${token || ""}`,
-  },
-});
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token || ""}`,
+        },
+      });
 
       if (res.status === 401) {
         localStorage.removeItem("token");
@@ -260,8 +243,9 @@ export default function UnitsPage() {
         return;
       }
 
+      const data = await res.json().catch(() => null);
+
       if (!res.ok) {
-        const data = await res.json().catch(() => null);
         throw new Error(data?.error || "Failed to delete unit");
       }
 
@@ -302,7 +286,7 @@ export default function UnitsPage() {
     return (
       <span
         className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${
-          map[status] || "bg-slate-100 text-slate-700 border-slate-200"
+          map[status] || "border-slate-200 bg-slate-100 text-slate-700"
         }`}
       >
         {status.replaceAll("_", " ")}
@@ -355,27 +339,10 @@ export default function UnitsPage() {
     },
   ];
 
-  const initials =
-    (user?.fullName || user?.name || "User")
-      .split(" ")
-      .map((part) => part[0])
-      .join("")
-      .slice(0, 2)
-      .toUpperCase() || "US";
-
-  const displayRole =
-    normalizedRole === "ADMIN"
-      ? "Admin"
-      : normalizedRole === "OWNER"
-      ? "Super Admin"
-      : "User";
-
-  const userDisplayName = user?.fullName || user?.name || "User";
-
   if (checkingAuth) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-100 p-8">
-        <div className="rounded-3xl border border-slate-200 bg-white px-8 py-6 shadow-xl text-slate-700">
+        <div className="rounded-3xl border border-slate-200 bg-white px-8 py-6 text-slate-700 shadow-xl">
           Checking session...
         </div>
       </div>
@@ -383,372 +350,239 @@ export default function UnitsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900">
-      <div className="flex min-h-screen">
-        <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 bg-gradient-to-b from-blue-950 via-blue-900 to-slate-900 text-white shadow-2xl lg:flex lg:flex-col">
-          <div className="border-b border-white/10 px-6 py-7">
-            <h1 className="text-3xl font-bold tracking-tight">PropertyOS</h1>
-            <p className="mt-2 text-sm text-blue-100/70">
-              Smart Property Management
-            </p>
-          </div>
+    <AdminShell
+      user={user}
+      activeItem="units"
+      title="Units"
+      subtitle="Manage rentable units inside your properties."
+      actions={
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={refreshAll}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Refresh
+          </button>
 
-          <nav className="flex-1 overflow-y-auto px-4 py-6">
-            <p className="mb-3 px-3 text-xs font-semibold uppercase tracking-widest text-blue-200/50">
-              Main Menu
-            </p>
-
-            <div className="space-y-2">
-                          <SidebarItem
-                            label="Dashboard"
-                            icon={<LayoutDashboard size={18} />}
-                            
-                            href="/dashboard"
-                          />
-                          <SidebarItem
-                            label="Properties"
-                            icon={<Building2 size={18} />}
-                            href="/properties"
-                          />
-                          <SidebarItem
-                            label="Tenants"
-                            icon={<Users size={18} />}
-                            href="/tenants"
-                          />
-                          <SidebarItem
-                            label="Units"
-                            icon={<Home size={18} />}
-                            active
-                            href="/units"
-                          />
-                          <SidebarItem
-                            label="Vendors"
-                            icon={<Wrench size={18} />}
-                            href="/vendors"
-                          />
-                          <SidebarItem
-                            label="Maintenance"
-                            icon={<Wrench size={18} />}
-                            href="/maintenance"
-                          />
-                          <SidebarItem
-                            label="Financials"
-                            icon={<Wallet size={18} />}
-                            href="/payments"
-                          />
-                          <SidebarItem
-                            label="Documents"
-                            icon={<FileText size={18} />}
-                            href="/documents"
-                          />
-                          <SidebarItem
-                            label="AI Insights"
-                            icon={<Brain size={18} />}
-                            href="/insights"
-                          />
-                          <SidebarItem
-                            label="Settings"
-                            icon={<Settings size={18} />}
-                            href="/settings"
-                          />
-                        </div>
-          </nav>
-
-          <div className="border-t border-white/10 px-6 py-5">
-            <p className="text-xs uppercase tracking-widest text-blue-200/50">
-              Current Role
-            </p>
-            <p className="mt-2 font-semibold">{displayRole}</p>
-
-            <div className="mt-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/10 px-3 py-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
-                {initials}
-              </div>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-white">
-                  {userDisplayName}
-                </p>
-                <p className="truncate text-xs text-blue-100/70">
-                  {user?.email || displayRole}
-                </p>
-              </div>
-            </div>
-
-            <button
-              onClick={() => {
-                localStorage.removeItem("token");
-                localStorage.removeItem("user");
-                window.location.href = "/";
-              }}
-              className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-200 transition hover:bg-red-500/20 hover:text-white"
+          {canEdit && (
+            <Link
+              href="/units/new"
+              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
             >
-              <LogOut size={16} />
-              Logout
-            </button>
+              <Plus className="h-4 w-4" />
+              New Unit
+            </Link>
+          )}
+        </div>
+      }
+    >
+      <div className="space-y-6">
+        {isSuperAdmin && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-700">
+            <div className="flex items-start gap-3">
+              <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />
+              <div>
+                <p className="font-semibold">Read-only Super Admin mode</p>
+                <p className="mt-1">
+                  You can review all units, but only Admin can create, edit, or
+                  delete units.
+                </p>
+              </div>
+            </div>
           </div>
-        </aside>
+        )}
 
-        <main className="flex-1 lg:ml-72">
-          <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
-            <div className="flex flex-col gap-5 px-6 py-5 md:flex-row md:items-center md:justify-between md:px-8">
-              <div className="flex items-start gap-4">
-                <Link
-                  href="/dashboard"
-                  className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Dashboard
-                </Link>
-
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {statCards.map((card) => (
+            <div
+              key={card.label}
+              className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200"
+            >
+              <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-3xl font-bold tracking-tight text-slate-900">
-                    Units
-                  </h2>
-                  <p className="mt-1 text-slate-500">
-                    Manage rentable units inside your properties.
-                  </p>
+                  <p className="text-sm text-slate-500">{card.label}</p>
+                  <h3 className="mt-2 text-2xl font-bold text-slate-900">
+                    {statsLoading ? "..." : card.value}
+                  </h3>
                 </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3">
-                <button
-                  onClick={refreshAll}
-                  className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  Refresh
-                </button>
-
-                {canEdit && (
-                  <Link
-                    href="/units/new"
-                    className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
-                  >
-                    <Plus className="h-4 w-4" />
-                    New Unit
-                  </Link>
-                )}
-
-                <div className="ml-2 flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
-                    {initials}
-                  </div>
-                  <div className="hidden sm:block">
-                    <p className="text-sm font-semibold text-slate-900">
-                      {userDisplayName}
-                    </p>
-                    <p className="text-xs text-slate-500">{displayRole}</p>
-                  </div>
+                <div className={`rounded-xl p-3 ${card.bg} ${card.color}`}>
+                  {card.icon}
                 </div>
               </div>
             </div>
-          </header>
+          ))}
+        </div>
 
-          <div className="p-6 md:p-8">
-            {isSuperAdmin && (
-              <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-700">
-                <div className="flex items-start gap-3">
-                  <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />
-                  <div>
-                    <p className="font-semibold">Read-only Super Admin mode</p>
-                    <p className="mt-1">
-                      You can review all units, but only Admin can create, edit,
-                      or delete units.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
+        <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+          <div className="mb-4 flex items-center gap-2">
+            <Filter className="h-4 w-4 text-slate-500" />
+            <h2 className="text-sm font-semibold text-slate-800">Filters</h2>
+          </div>
 
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              {statCards.map((card) => (
-                <div
-                  key={card.label}
-                  className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-slate-500">{card.label}</p>
-                      <h3 className="mt-2 text-2xl font-bold text-slate-900">
-                        {statsLoading ? "..." : card.value}
-                      </h3>
-                    </div>
-                    <div className={`rounded-xl p-3 ${card.bg} ${card.color}`}>
-                      {card.icon}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-              <div className="mb-4 flex items-center gap-2">
-                <Filter className="h-4 w-4 text-slate-500" />
-                <h2 className="text-sm font-semibold text-slate-800">Filters</h2>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">
-                    Search
-                  </label>
-                  <div className="relative">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                    <input
-                      type="text"
-                      placeholder="Unit code, unit name, property..."
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-900 outline-none transition focus:border-slate-500"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">
-                    Occupancy
-                  </label>
-                  <select
-                    value={occupancyStatus}
-                    onChange={(e) => setOccupancyStatus(e.target.value)}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-500"
-                  >
-                    <option value="">All Occupancy Statuses</option>
-                    <option value="AVAILABLE">Available</option>
-                    <option value="OCCUPIED">Occupied</option>
-                    <option value="RESERVED">Reserved</option>
-                    <option value="MAINTENANCE">Maintenance</option>
-                  </select>
-                </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-700">
+                Search
+              </label>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Unit code, unit name, property..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                />
               </div>
             </div>
 
-            <div className="mt-6 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
-              <div className="border-b border-slate-200 px-5 py-4">
-                <h2 className="text-sm font-semibold text-slate-800">Units</h2>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-700">
+                Occupancy
+              </label>
+              <select
+                value={occupancyStatus}
+                onChange={(e) => setOccupancyStatus(e.target.value)}
+                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+              >
+                <option value="">All Occupancy Statuses</option>
+                <option value="AVAILABLE">Available</option>
+                <option value="OCCUPIED">Occupied</option>
+                <option value="RESERVED">Reserved</option>
+                <option value="MAINTENANCE">Maintenance</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+          <div className="border-b border-slate-200 px-5 py-4">
+            <h2 className="text-sm font-semibold text-slate-800">Units</h2>
+          </div>
+
+          {loading ? (
+            <div className="p-10 text-center text-sm text-slate-500">
+              <div className="inline-flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading units...
               </div>
+            </div>
+          ) : error ? (
+            <div className="p-10 text-center text-sm text-red-600">
+              {error}
+            </div>
+          ) : units.length === 0 ? (
+            <div className="p-10 text-center text-sm text-slate-500">
+              No units found.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-[1050px] text-left text-sm">
+                <thead className="bg-slate-50 text-slate-600">
+                  <tr>
+                    <th className="px-5 py-3 font-semibold">Unit Code</th>
+                    <th className="px-5 py-3 font-semibold">Unit Name</th>
+                    <th className="px-5 py-3 font-semibold">Property</th>
+                    <th className="px-5 py-3 font-semibold">Floor</th>
+                    <th className="px-5 py-3 font-semibold">Beds / Baths</th>
+                    <th className="px-5 py-3 font-semibold">Rent</th>
+                    <th className="px-5 py-3 font-semibold">Occupancy</th>
+                    <th className="px-5 py-3 font-semibold">State</th>
+                    <th className="px-5 py-3 text-right font-semibold">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
 
-              {loading ? (
-                <div className="p-10 text-center text-sm text-slate-500">
-                  <div className="inline-flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Loading units...
-                  </div>
-                </div>
-              ) : error ? (
-                <div className="p-10 text-center text-sm text-red-600">{error}</div>
-              ) : units.length === 0 ? (
-                <div className="p-10 text-center text-sm text-slate-500">
-                  No units found.
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-left text-sm">
-                    <thead className="bg-slate-50 text-slate-600">
-                      <tr>
-                        <th className="px-5 py-3 font-semibold">Unit Code</th>
-                        <th className="px-5 py-3 font-semibold">Unit Name</th>
-                        <th className="px-5 py-3 font-semibold">Property</th>
-                        <th className="px-5 py-3 font-semibold">Floor</th>
-                        <th className="px-5 py-3 font-semibold">Beds / Baths</th>
-                        <th className="px-5 py-3 font-semibold">Rent</th>
-                        <th className="px-5 py-3 font-semibold">Occupancy</th>
-                        <th className="px-5 py-3 font-semibold">State</th>
-                        <th className="px-5 py-3 font-semibold text-right">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {units.map((unit) => (
-                        <tr key={unit.id} className="hover:bg-slate-50/70">
-                          <td className="px-5 py-4 font-medium text-slate-900">
-                            {unit.unitCode}
-                          </td>
+                <tbody className="divide-y divide-slate-100">
+                  {units.map((unit) => (
+                    <tr key={unit.id} className="hover:bg-slate-50/70">
+                      <td className="px-5 py-4 font-medium text-slate-900">
+                        {unit.unitCode}
+                      </td>
 
-                          <td className="px-5 py-4">
-                            <div className="font-medium text-slate-900">
-                              {unit.unitName || "—"}
-                            </div>
-                            <div className="mt-1 text-xs text-slate-500">
-                              {unit.areaSqm ? `${unit.areaSqm} sqm` : "No area set"}
-                            </div>
-                          </td>
+                      <td className="px-5 py-4">
+                        <div className="font-medium text-slate-900">
+                          {unit.unitName || "—"}
+                        </div>
+                        <div className="mt-1 text-xs text-slate-500">
+                          {unit.areaSqm ? `${unit.areaSqm} sqm` : "No area set"}
+                        </div>
+                      </td>
 
-                          <td className="px-5 py-4">
-                            <div className="font-medium text-slate-900">
-                              {unit.property?.name || unit.property?.code}
-                            </div>
-                            <div className="text-xs text-slate-500">
-                              {unit.property?.addressLine1 || "—"}
-                              {unit.property?.city ? `, ${unit.property.city}` : ""}
-                            </div>
-                          </td>
+                      <td className="px-5 py-4">
+                        <div className="font-medium text-slate-900">
+                          {unit.property?.name || unit.property?.code}
+                        </div>
+                        <div className="text-xs text-slate-500">
+                          {unit.property?.addressLine1 || "—"}
+                          {unit.property?.city ? `, ${unit.property.city}` : ""}
+                        </div>
+                      </td>
 
-                          <td className="px-5 py-4 text-slate-700">
-                            {unit.floor ?? "—"}
-                          </td>
+                      <td className="px-5 py-4 text-slate-700">
+                        {unit.floor ?? "—"}
+                      </td>
 
-                          <td className="px-5 py-4 text-slate-700">
-                            {unit.bedrooms ?? "—"} / {unit.bathrooms ?? "—"}
-                          </td>
+                      <td className="px-5 py-4 text-slate-700">
+                        {unit.bedrooms ?? "—"} / {unit.bathrooms ?? "—"}
+                      </td>
 
-                          <td className="px-5 py-4 text-slate-700">
-                            {formatMoney(unit.monthlyRent)}
-                          </td>
+                      <td className="px-5 py-4 text-slate-700">
+                        {formatMoney(unit.monthlyRent)}
+                      </td>
 
-                          <td className="px-5 py-4">
-                            {getOccupancyBadge(unit.occupancyStatus)}
-                          </td>
+                      <td className="px-5 py-4">
+                        {getOccupancyBadge(unit.occupancyStatus)}
+                      </td>
 
-                          <td className="px-5 py-4">
-                            {getActiveBadge(unit.isActive)}
-                          </td>
+                      <td className="px-5 py-4">
+                        {getActiveBadge(unit.isActive)}
+                      </td>
 
-                          <td className="px-5 py-4">
-                            <div className="flex justify-end gap-2">
+                      <td className="px-5 py-4">
+                        <div className="flex justify-end gap-2">
+                          <Link
+                            href={`/units/${unit.id}`}
+                            className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                            View
+                          </Link>
+
+                          {canEdit ? (
+                            <>
                               <Link
-                                href={`/units/${unit.id}`}
-                                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                                href={`/units/edit/${unit.id}`}
+                                className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700 hover:bg-blue-100"
                               >
-                                <Eye className="h-3.5 w-3.5" />
-                                View
+                                <Pencil className="h-3.5 w-3.5" />
+                                Edit
                               </Link>
 
-                              {canEdit ? (
-                                <>
-                                  <Link
-                                    href={`/units/edit/${unit.id}`}
-                                    className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                                  >
-                                    <Pencil className="h-3.5 w-3.5" />
-                                    Edit
-                                  </Link>
-
-                                  <button
-                                    onClick={() => handleDeleteClick(unit)}
-                                    className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-100"
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                    Delete
-                                  </button>
-                                </>
-                              ) : (
-                                <span className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-500">
-                                  Read only
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                              <button
+                                onClick={() => handleDeleteClick(unit)}
+                                className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-100"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                                Delete
+                              </button>
+                            </>
+                          ) : (
+                            <span className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-500">
+                              Read only
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </div>
-        </main>
+          )}
+        </div>
       </div>
 
       {deleteModalOpen && selectedUnit && canEdit && (
@@ -795,33 +629,6 @@ export default function UnitsPage() {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function SidebarItem({
-  label,
-  icon,
-  href,
-  active = false,
-}: {
-  label: string;
-  icon: React.ReactNode;
-  href: string;
-  active?: boolean;
-}) {
-  return (
-    <Link href={href}>
-      <div
-        className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-medium transition ${
-          active
-            ? "bg-white/15 text-white shadow"
-            : "text-blue-100/80 hover:bg-white/10 hover:text-white"
-        }`}
-      >
-        <span>{icon}</span>
-        <span>{label}</span>
-      </div>
-    </Link>
+    </AdminShell>
   );
 }

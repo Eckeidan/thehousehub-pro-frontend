@@ -1,17 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import {
-  LayoutDashboard,
-  Building2,
-  Users,
-  Wallet,
-  FileText,
-  Brain,
-  Settings,
-  Wrench,
-  Home,
   Bell,
   Shield,
   Database,
@@ -20,16 +11,17 @@ import {
   X,
   AlertCircle,
   CheckCircle2,
-  LogOut,
   Loader2,
   UserPlus,
-  Mail,
   Lock,
   UserCog,
   Palette,
   CreditCard,
+  Building2,
+  Settings,
+  ShieldCheck,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import AdminShell from "@/components/AdminShell";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
@@ -39,6 +31,7 @@ type StoredUser = {
   name?: string;
   email?: string;
   role?: string;
+  organizationId?: string;
 };
 
 type AppUser = {
@@ -48,6 +41,7 @@ type AppUser = {
   email: string;
   role: string;
   isActive?: boolean;
+  organizationId?: string | null;
   createdAt?: string;
 };
 
@@ -117,21 +111,6 @@ export default function SettingsPage() {
   const isSuperAdmin = normalizedRole === "OWNER";
   const canEditSettings = normalizedRole === "ADMIN";
 
-  const displayRole =
-    normalizedRole === "OWNER"
-      ? "Super Admin"
-      : normalizedRole === "ADMIN"
-      ? "Admin"
-      : "User";
-
-  const initials =
-    (user?.fullName || user?.name || "User")
-      .split(" ")
-      .map((part) => part[0])
-      .join("")
-      .slice(0, 2)
-      .toUpperCase() || "US";
-
   function showNotification(
     type: "success" | "error",
     title: string,
@@ -144,12 +123,6 @@ export default function SettingsPage() {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     router.replace("/");
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    window.location.href = "/";
   };
 
   useEffect(() => {
@@ -182,9 +155,11 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!notification.open) return;
+
     const timer = setTimeout(() => {
       setNotification((prev) => ({ ...prev, open: false }));
     }, 4000);
+
     return () => clearTimeout(timer);
   }, [notification.open]);
 
@@ -201,6 +176,7 @@ export default function SettingsPage() {
   async function fetchSettings() {
     try {
       setLoading(true);
+
       const token = localStorage.getItem("token");
 
       const res = await fetch(`${API_BASE}/api/settings`, {
@@ -253,10 +229,9 @@ export default function SettingsPage() {
   }
 
   async function fetchUsers() {
-    if (!isSuperAdmin) return;
-
     try {
       setUsersLoading(true);
+
       const token = localStorage.getItem("token");
 
       const res = await fetch(`${API_BASE}/api/users`, {
@@ -294,13 +269,14 @@ export default function SettingsPage() {
       showNotification(
         "error",
         "Read-only access",
-        "Only Admin can modify operational settings."
+        "Only the connected Admin can modify organization settings."
       );
       return;
     }
 
     try {
       setSaving(true);
+
       const token = localStorage.getItem("token");
 
       const res = await fetch(`${API_BASE}/api/settings`, {
@@ -314,18 +290,15 @@ export default function SettingsPage() {
           email,
           currency,
           timezone,
-
           logoUrl,
           primaryColor,
           supportEmail,
-
           bankName,
           bankAccountName,
           bankAccountNumber,
           paymentInstructions,
           rentDueDay,
           lateFeeAmount,
-
           tenantAccessDefault,
           notifications,
           maintenanceAlerts,
@@ -347,7 +320,7 @@ export default function SettingsPage() {
       showNotification(
         "success",
         "Settings saved",
-        "Your settings have been updated successfully."
+        "Your organization settings have been updated successfully."
       );
     } catch (error: any) {
       showNotification(
@@ -367,7 +340,7 @@ export default function SettingsPage() {
       showNotification(
         "error",
         "Access denied",
-        "Only the Super Admin can create Admin and Owner accounts."
+        "Only Super Admin can create Admin and Owner accounts."
       );
       return;
     }
@@ -385,17 +358,9 @@ export default function SettingsPage() {
       return;
     }
 
-    if (newUserForm.password.trim().length < 6) {
-      showNotification(
-        "error",
-        "Weak password",
-        "Password must be at least 6 characters."
-      );
-      return;
-    }
-
     try {
       setCreatingUser(true);
+
       const token = localStorage.getItem("token");
 
       const res = await fetch(`${API_BASE}/api/users`, {
@@ -459,7 +424,7 @@ export default function SettingsPage() {
       showNotification(
         "error",
         "Missing information",
-        "Please fill current password, new password and confirmation."
+        "Please fill all password fields."
       );
       return;
     }
@@ -484,6 +449,7 @@ export default function SettingsPage() {
 
     try {
       setChangingPassword(true);
+
       const token = localStorage.getItem("token");
 
       const res = await fetch(`${API_BASE}/api/auth/change-password`, {
@@ -528,8 +494,6 @@ export default function SettingsPage() {
     }
   }
 
-  const isError = notification.type === "error";
-
   const sortedUsers = useMemo(() => {
     return [...users].sort((a, b) => {
       const roleA = String(a.role || "").toUpperCase();
@@ -542,6 +506,7 @@ export default function SettingsPage() {
       };
 
       const roleCompare = (order[roleA] || 99) - (order[roleB] || 99);
+
       if (roleCompare !== 0) return roleCompare;
 
       const nameA = String(a.fullName || a.name || "").toLowerCase();
@@ -551,10 +516,12 @@ export default function SettingsPage() {
     });
   }, [users]);
 
+  const isError = notification.type === "error";
+
   if (checkingAuth) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-100 p-8">
-        <div className="rounded-3xl border border-slate-200 bg-white px-8 py-6 shadow-xl text-slate-700">
+        <div className="rounded-3xl border border-slate-200 bg-white px-8 py-6 text-slate-700 shadow-xl">
           <div className="flex items-center gap-2">
             <Loader2 className="h-5 w-5 animate-spin" />
             Checking session...
@@ -565,154 +532,150 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-300">
-      {notification.open && (
-        <div className="fixed right-6 top-6 z-[110] w-full max-w-md">
-          <div
-            className={`rounded-3xl border bg-white shadow-2xl ${
-              isError ? "border-red-200" : "border-emerald-200"
-            }`}
-          >
-            <div className="flex items-start gap-3 p-5">
-              <div
-                className={`mt-0.5 rounded-full p-2 ${
-                  isError
-                    ? "bg-red-100 text-red-600"
-                    : "bg-emerald-100 text-emerald-600"
-                }`}
-              >
-                {isError ? (
-                  <AlertCircle className="h-5 w-5" />
-                ) : (
-                  <CheckCircle2 className="h-5 w-5" />
-                )}
-              </div>
-
-              <div className="flex-1">
-                <p
-                  className={`text-sm font-semibold ${
-                    isError ? "text-red-700" : "text-emerald-700"
+    <AdminShell
+      user={user}
+      activeItem="settings"
+      title="Settings"
+      subtitle="Configure organization profile, branding, payment settings, security and system preferences."
+      actions={
+        <button
+          onClick={handleSave}
+          disabled={!canEditSettings || saving || loading}
+          className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <Save className="h-4 w-4" />
+          {saving ? "Saving..." : "Save Settings"}
+        </button>
+      }
+    >
+      <div className="space-y-6">
+        {notification.open && (
+          <div className="fixed right-4 top-4 z-[110] w-[calc(100%-2rem)] max-w-md sm:right-6 sm:top-6">
+            <div
+              className={`rounded-3xl border bg-white shadow-2xl ${
+                isError ? "border-red-200" : "border-emerald-200"
+              }`}
+            >
+              <div className="flex items-start gap-3 p-5">
+                <div
+                  className={`mt-0.5 rounded-full p-2 ${
+                    isError
+                      ? "bg-red-100 text-red-600"
+                      : "bg-emerald-100 text-emerald-600"
                   }`}
                 >
-                  {notification.title}
-                </p>
-                <p className="mt-1 text-sm leading-6 text-slate-600">
-                  {notification.message}
+                  {isError ? (
+                    <AlertCircle className="h-5 w-5" />
+                  ) : (
+                    <CheckCircle2 className="h-5 w-5" />
+                  )}
+                </div>
+
+                <div className="flex-1">
+                  <p
+                    className={`text-sm font-semibold ${
+                      isError ? "text-red-700" : "text-emerald-700"
+                    }`}
+                  >
+                    {notification.title}
+                  </p>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">
+                    {notification.message}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setNotification((prev) => ({ ...prev, open: false }))
+                  }
+                  className="rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-4 text-sm text-blue-700">
+          <div className="flex items-start gap-3">
+            <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />
+            <div>
+              <p className="font-semibold">Organization-secured settings</p>
+              <p className="mt-1">
+                Current Org ID:{" "}
+                <span className="font-mono">
+                  {user?.organizationId || "No organizationId"}
+                </span>
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {isSuperAdmin && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-700">
+            <div className="flex items-start gap-3">
+              <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />
+              <div>
+                <p className="font-semibold">Read-only Super Admin mode</p>
+                <p className="mt-1">
+                  You can review organization settings and manage accounts, but
+                  operational settings are editable only by the connected Admin.
                 </p>
               </div>
-
-              <button
-                type="button"
-                onClick={() =>
-                  setNotification((prev) => ({ ...prev, open: false }))
-                }
-                className="rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
-              >
-                <X className="h-4 w-4" />
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 lg:flex lg:flex-col bg-gradient-to-b from-blue-950 via-blue-900 to-slate-900 text-white shadow-2xl">
-        <div className="border-b border-white/10 px-6 py-7">
-          <h1 className="text-3xl font-bold tracking-tight">The House Hub</h1>
-          <p className="mt-2 text-sm text-blue-100/70">
-            Smart Property Management
-          </p>
-        </div>
-
-        <nav className="flex-1 overflow-y-auto px-4 py-6">
-          <p className="mb-3 px-3 text-xs font-semibold uppercase tracking-widest text-blue-200/50">
-            Main Menu
-          </p>
-
-          <div className="space-y-2">
-            <SidebarItem label="Dashboard" icon={<LayoutDashboard size={18} />} href="/dashboard" />
-            <SidebarItem label="Properties" icon={<Building2 size={18} />} href="/properties" />
-            <SidebarItem label="Tenants" icon={<Users size={18} />} href="/tenants" />
-            <SidebarItem label="Units" icon={<Home size={18} />} href="/units" />
-            <SidebarItem label="Vendors" icon={<Wrench size={18} />} href="/vendors" />
-            <SidebarItem label="Maintenance" icon={<Wrench size={18} />} href="/maintenance" />
-            <SidebarItem label="Financials" icon={<Wallet size={18} />} href="/payments" />
-            <SidebarItem label="Documents" icon={<FileText size={18} />} href="/documents" />
-            <SidebarItem label="AI Insights" icon={<Brain size={18} />} href="/insights" />
-            <SidebarItem label="Settings" icon={<Settings size={18} />} active href="/settings" />
+        {loading ? (
+          <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center text-slate-500 shadow-sm">
+            Loading settings...
           </div>
-        </nav>
-
-        <div className="border-t border-white/10 px-6 py-5">
-          <p className="text-xs uppercase tracking-widest text-blue-200/50">
-            Current Role
-          </p>
-          <p className="mt-2 font-semibold">{displayRole}</p>
-
-          <div className="mt-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/10 px-3 py-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-500 text-sm font-bold text-white">
-              {initials}
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-white">
-                {user?.fullName || user?.name || "User"}
-              </p>
-              <p className="text-xs text-blue-100/80">{displayRole}</p>
-            </div>
-          </div>
-
-          <button
-            onClick={handleLogout}
-            className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-200 transition hover:bg-red-500/20 hover:text-white"
-          >
-            <LogOut size={16} />
-            Logout
-          </button>
-        </div>
-      </aside>
-
-      <main className="min-h-screen px-4 py-6 lg:pl-[352px] lg:pr-7">
-        <div className="mx-auto max-w-7xl">
-          <div className="mb-8 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-            <div>
-              <h2 className="text-4xl font-bold tracking-tight text-slate-900">
-                Settings
-              </h2>
-              <p className="mt-3 text-xl text-slate-500">
-                Configure company details, branding, payments, security and system preferences.
-              </p>
-            </div>
-
-            <button
-              onClick={handleSave}
-              disabled={!canEditSettings || saving || loading}
-              className="inline-flex items-center gap-2 rounded-2xl bg-[#1f3270] px-5 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-[#19295d] disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <Save className="h-4 w-4" />
-              {saving ? "Saving..." : "Save Settings"}
-            </button>
-          </div>
-
-          {isSuperAdmin && (
-            <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-700">
-              Super Admin mode: you can review all settings and manage Admin / Owner accounts, but operational settings are read-only.
-            </div>
-          )}
-
+        ) : (
           <div className="grid gap-6 xl:grid-cols-3">
             <div className="space-y-6 xl:col-span-2">
-              <CardHeader icon={<Building2 className="h-5 w-5" />} title="Company Profile" color="blue" />
-              <div className="-mt-6 rounded-b-[28px] border-x border-b border-slate-200 bg-white p-6 shadow-sm">
+              <SettingsCard
+                icon={<Building2 className="h-5 w-5" />}
+                title="Company Profile"
+                color="blue"
+              >
                 <div className="grid gap-4 md:grid-cols-2">
-                  <Input value={companyName} disabled={!canEditSettings} onChange={setCompanyName} placeholder="Company Name" />
-                  <Input value={email} disabled={!canEditSettings} onChange={setEmail} placeholder="Company Email" type="email" />
+                  <Input
+                    value={companyName}
+                    disabled={!canEditSettings}
+                    onChange={setCompanyName}
+                    placeholder="Company Name"
+                  />
+                  <Input
+                    value={email}
+                    disabled={!canEditSettings}
+                    onChange={setEmail}
+                    placeholder="Company Email"
+                    type="email"
+                  />
                 </div>
-              </div>
+              </SettingsCard>
 
-              <CardHeader icon={<Palette className="h-5 w-5" />} title="Company Branding" color="indigo" />
-              <div className="-mt-6 rounded-b-[28px] border-x border-b border-slate-200 bg-white p-6 shadow-sm">
+              <SettingsCard
+                icon={<Palette className="h-5 w-5" />}
+                title="Company Branding"
+                color="indigo"
+              >
                 <div className="grid gap-4 md:grid-cols-2">
-                  <Input value={logoUrl} disabled={!canEditSettings} onChange={setLogoUrl} placeholder="Logo URL" />
-                  <Input value={supportEmail} disabled={!canEditSettings} onChange={setSupportEmail} placeholder="Support Email" type="email" />
+                  <Input
+                    value={logoUrl}
+                    disabled={!canEditSettings}
+                    onChange={setLogoUrl}
+                    placeholder="Logo URL"
+                  />
+                  <Input
+                    value={supportEmail}
+                    disabled={!canEditSettings}
+                    onChange={setSupportEmail}
+                    placeholder="Support Email"
+                    type="email"
+                  />
 
                   <div className="md:col-span-2 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                     <label className="mb-2 block text-sm font-medium text-slate-700">
@@ -739,41 +702,78 @@ export default function SettingsPage() {
                         <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                           Logo Preview
                         </p>
-                        <img src={logoUrl} alt="Company logo" className="max-h-20 max-w-full object-contain" />
+                        <img
+                          src={logoUrl}
+                          alt="Company logo"
+                          className="max-h-20 max-w-full object-contain"
+                        />
                       </div>
                     )}
                   </div>
                 </div>
-              </div>
+              </SettingsCard>
 
-              <CardHeader icon={<CreditCard className="h-5 w-5" />} title="Payment Settings" color="emerald" />
-              <div className="-mt-6 rounded-b-[28px] border-x border-b border-slate-200 bg-white p-6 shadow-sm">
+              <SettingsCard
+                icon={<CreditCard className="h-5 w-5" />}
+                title="Payment Settings"
+                color="emerald"
+              >
                 <div className="grid gap-4 md:grid-cols-2">
-                  <Input value={bankName} disabled={!canEditSettings} onChange={setBankName} placeholder="Bank Name" />
-                  <Input value={bankAccountName} disabled={!canEditSettings} onChange={setBankAccountName} placeholder="Account Name" />
-                  <Input value={bankAccountNumber} disabled={!canEditSettings} onChange={setBankAccountNumber} placeholder="Account Number / Routing / Zelle / CashApp" />
-                  <Input value={String(rentDueDay)} disabled={!canEditSettings} onChange={(v) => setRentDueDay(Number(v))} placeholder="Rent Due Day" type="number" />
-                  <Input value={String(lateFeeAmount)} disabled={!canEditSettings} onChange={(v) => setLateFeeAmount(Number(v))} placeholder="Late Fee Amount" type="number" />
+                  <Input
+                    value={bankName}
+                    disabled={!canEditSettings}
+                    onChange={setBankName}
+                    placeholder="Bank Name"
+                  />
+                  <Input
+                    value={bankAccountName}
+                    disabled={!canEditSettings}
+                    onChange={setBankAccountName}
+                    placeholder="Account Name"
+                  />
+                  <Input
+                    value={bankAccountNumber}
+                    disabled={!canEditSettings}
+                    onChange={setBankAccountNumber}
+                    placeholder="Account Number / Routing / Zelle / CashApp"
+                  />
+                  <Input
+                    value={String(rentDueDay)}
+                    disabled={!canEditSettings}
+                    onChange={(v) => setRentDueDay(Number(v))}
+                    placeholder="Rent Due Day"
+                    type="number"
+                  />
+                  <Input
+                    value={String(lateFeeAmount)}
+                    disabled={!canEditSettings}
+                    onChange={(v) => setLateFeeAmount(Number(v))}
+                    placeholder="Late Fee Amount"
+                    type="number"
+                  />
 
                   <textarea
                     value={paymentInstructions}
                     disabled={!canEditSettings}
                     onChange={(e) => setPaymentInstructions(e.target.value)}
-                    placeholder="Payment Instructions for tenants..."
+                    placeholder="Payment instructions for tenants..."
                     rows={5}
-                    className="md:col-span-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 outline-none transition disabled:cursor-not-allowed disabled:opacity-70 focus:border-[#1f3270] focus:bg-white"
+                    className="md:col-span-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 outline-none transition disabled:cursor-not-allowed disabled:opacity-70 focus:border-blue-600 focus:bg-white"
                   />
                 </div>
-              </div>
+              </SettingsCard>
 
-              <CardHeader icon={<Settings className="h-5 w-5" />} title="System Preferences" color="purple" />
-              <div className="-mt-6 rounded-b-[28px] border-x border-b border-slate-200 bg-white p-6 shadow-sm">
+              <SettingsCard
+                icon={<Settings className="h-5 w-5" />}
+                title="System Preferences"
+                color="purple"
+              >
                 <div className="grid gap-4 md:grid-cols-2">
                   <select
                     value={currency}
                     disabled={!canEditSettings}
                     onChange={(e) => setCurrency(e.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 outline-none transition disabled:cursor-not-allowed disabled:opacity-70 focus:border-[#1f3270] focus:bg-white"
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 outline-none transition disabled:cursor-not-allowed disabled:opacity-70 focus:border-blue-600 focus:bg-white"
                   >
                     <option value="USD">USD</option>
                     <option value="EUR">EUR</option>
@@ -784,62 +784,99 @@ export default function SettingsPage() {
                     value={timezone}
                     disabled={!canEditSettings}
                     onChange={(e) => setTimezone(e.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 outline-none transition disabled:cursor-not-allowed disabled:opacity-70 focus:border-[#1f3270] focus:bg-white"
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 outline-none transition disabled:cursor-not-allowed disabled:opacity-70 focus:border-blue-600 focus:bg-white"
                   >
                     <option value="UTC">UTC</option>
                     <option value="Africa/Kinshasa">Africa/Kinshasa</option>
                     <option value="America/New_York">America/New_York</option>
                   </select>
                 </div>
-              </div>
+              </SettingsCard>
 
-              <CardHeader icon={<FileCheck className="h-5 w-5" />} title="Document Settings" color="emerald" />
-              <div className="-mt-6 rounded-b-[28px] border-x border-b border-slate-200 bg-white p-6 shadow-sm">
-                <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                  <input
-                    type="checkbox"
-                    checked={tenantAccessDefault}
-                    disabled={!canEditSettings}
-                    onChange={() => setTenantAccessDefault(!tenantAccessDefault)}
-                    className="h-4 w-4"
-                  />
-                  <span className="text-sm font-medium text-slate-700">
-                    Allow tenant access by default
-                  </span>
-                </label>
-              </div>
+              <SettingsCard
+                icon={<FileCheck className="h-5 w-5" />}
+                title="Document Settings"
+                color="emerald"
+              >
+                <Toggle
+                  label="Allow tenant access by default"
+                  checked={tenantAccessDefault}
+                  disabled={!canEditSettings}
+                  onChange={() =>
+                    setTenantAccessDefault(!tenantAccessDefault)
+                  }
+                />
+              </SettingsCard>
 
               {isSuperAdmin && (
                 <>
-                  <CardHeader icon={<UserPlus className="h-5 w-5" />} title="Super Admin — Create Accounts" color="indigo" />
-                  <div className="-mt-6 rounded-b-[28px] border-x border-b border-slate-200 bg-white p-6 shadow-sm">
-                    <form onSubmit={handleCreateUser} className="grid gap-4 md:grid-cols-2">
-                      <Input value={newUserForm.fullName} onChange={(v) => setNewUserForm((p) => ({ ...p, fullName: v }))} placeholder="Full Name" />
+                  <SettingsCard
+                    icon={<UserPlus className="h-5 w-5" />}
+                    title="Super Admin — Create Accounts"
+                    color="indigo"
+                  >
+                    <form
+                      onSubmit={handleCreateUser}
+                      className="grid gap-4 md:grid-cols-2"
+                    >
+                      <Input
+                        value={newUserForm.fullName}
+                        onChange={(v) =>
+                          setNewUserForm((p) => ({ ...p, fullName: v }))
+                        }
+                        placeholder="Full Name"
+                      />
+
                       <select
                         value={newUserForm.role}
-                        onChange={(e) => setNewUserForm((p) => ({ ...p, role: e.target.value }))}
+                        onChange={(e) =>
+                          setNewUserForm((p) => ({
+                            ...p,
+                            role: e.target.value,
+                          }))
+                        }
                         className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 outline-none"
                       >
                         <option value="ADMIN">Admin</option>
                         <option value="OWNER">Owner</option>
                       </select>
-                      <Input value={newUserForm.email} onChange={(v) => setNewUserForm((p) => ({ ...p, email: v }))} placeholder="Email" type="email" />
-                      <Input value={newUserForm.password} onChange={(v) => setNewUserForm((p) => ({ ...p, password: v }))} placeholder="Password" type="password" />
+
+                      <Input
+                        value={newUserForm.email}
+                        onChange={(v) =>
+                          setNewUserForm((p) => ({ ...p, email: v }))
+                        }
+                        placeholder="Email"
+                        type="email"
+                      />
+
+                      <Input
+                        value={newUserForm.password}
+                        onChange={(v) =>
+                          setNewUserForm((p) => ({ ...p, password: v }))
+                        }
+                        placeholder="Password"
+                        type="password"
+                      />
+
                       <div className="md:col-span-2">
                         <button
                           type="submit"
                           disabled={creatingUser}
-                          className="inline-flex items-center gap-2 rounded-2xl bg-[#1f3270] px-5 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-[#19295d] disabled:cursor-not-allowed disabled:opacity-60"
+                          className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           <UserPlus className="h-4 w-4" />
                           {creatingUser ? "Creating..." : "Create Account"}
                         </button>
                       </div>
                     </form>
-                  </div>
+                  </SettingsCard>
 
-                  <CardHeader icon={<UserCog className="h-5 w-5" />} title="User Management" color="sky" />
-                  <div className="-mt-6 rounded-b-[28px] border-x border-b border-slate-200 bg-white p-6 shadow-sm">
+                  <SettingsCard
+                    icon={<UserCog className="h-5 w-5" />}
+                    title="User Management"
+                    color="sky"
+                  >
                     {usersLoading ? (
                       <EmptyText text="Loading users..." />
                     ) : sortedUsers.length === 0 ? (
@@ -847,7 +884,9 @@ export default function SettingsPage() {
                     ) : (
                       <div className="space-y-3">
                         {sortedUsers.map((account) => {
-                          const accountRole = String(account.role || "").toUpperCase();
+                          const accountRole = String(
+                            account.role || ""
+                          ).toUpperCase();
 
                           const badgeClass =
                             accountRole === "OWNER"
@@ -863,15 +902,27 @@ export default function SettingsPage() {
                             >
                               <div>
                                 <p className="font-semibold text-slate-900">
-                                  {account.fullName || account.name || "Unnamed user"}
+                                  {account.fullName ||
+                                    account.name ||
+                                    "Unnamed user"}
                                 </p>
-                                <p className="text-sm text-slate-500">{account.email}</p>
+                                <p className="text-sm text-slate-500">
+                                  {account.email}
+                                </p>
+                                <p className="mt-1 font-mono text-[11px] text-emerald-600">
+                                  Org: {account.organizationId || "-"}
+                                </p>
                               </div>
 
                               <div className="flex items-center gap-3">
-                                <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${badgeClass}`}>
-                                  {accountRole === "OWNER" ? "SUPER ADMIN" : accountRole}
+                                <span
+                                  className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${badgeClass}`}
+                                >
+                                  {accountRole === "OWNER"
+                                    ? "SUPER ADMIN"
+                                    : accountRole}
                                 </span>
+
                                 <span
                                   className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
                                     account.isActive === false
@@ -879,7 +930,9 @@ export default function SettingsPage() {
                                       : "bg-emerald-100 text-emerald-700"
                                   }`}
                                 >
-                                  {account.isActive === false ? "Inactive" : "Active"}
+                                  {account.isActive === false
+                                    ? "Inactive"
+                                    : "Active"}
                                 </span>
                               </div>
                             </div>
@@ -887,43 +940,82 @@ export default function SettingsPage() {
                         })}
                       </div>
                     )}
-                  </div>
+                  </SettingsCard>
                 </>
               )}
             </div>
 
             <div className="space-y-6">
-              <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="mb-6 flex items-center gap-3">
-                  <div className="rounded-2xl bg-amber-100 p-3 text-amber-600">
-                    <Bell className="h-5 w-5" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-slate-900">
-                    Notifications
-                  </h3>
-                </div>
-
+              <SettingsCard
+                icon={<Bell className="h-5 w-5" />}
+                title="Notifications"
+                color="amber"
+              >
                 <div className="space-y-4">
-                  <Toggle label="Enable email notifications" checked={notifications} disabled={!canEditSettings} onChange={() => setNotifications(!notifications)} />
-                  <Toggle label="Maintenance alerts" checked={maintenanceAlerts} disabled={!canEditSettings} onChange={() => setMaintenanceAlerts(!maintenanceAlerts)} />
-                  <Toggle label="Lease reminders" checked={leaseReminders} disabled={!canEditSettings} onChange={() => setLeaseReminders(!leaseReminders)} />
+                  <Toggle
+                    label="Enable email notifications"
+                    checked={notifications}
+                    disabled={!canEditSettings}
+                    onChange={() => setNotifications(!notifications)}
+                  />
+                  <Toggle
+                    label="Maintenance alerts"
+                    checked={maintenanceAlerts}
+                    disabled={!canEditSettings}
+                    onChange={() =>
+                      setMaintenanceAlerts(!maintenanceAlerts)
+                    }
+                  />
+                  <Toggle
+                    label="Lease reminders"
+                    checked={leaseReminders}
+                    disabled={!canEditSettings}
+                    onChange={() => setLeaseReminders(!leaseReminders)}
+                  />
                 </div>
-              </div>
+              </SettingsCard>
 
-              <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="mb-6 flex items-center gap-3">
-                  <div className="rounded-2xl bg-red-100 p-3 text-red-600">
-                    <Shield className="h-5 w-5" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-slate-900">
-                    Security
-                  </h3>
-                </div>
-
+              <SettingsCard
+                icon={<Shield className="h-5 w-5" />}
+                title="Security"
+                color="rose"
+              >
                 <form onSubmit={handleChangePassword} className="space-y-4">
-                  <Input value={passwordForm.currentPassword} onChange={(v) => setPasswordForm((p) => ({ ...p, currentPassword: v }))} placeholder="Current password" type="password" />
-                  <Input value={passwordForm.newPassword} onChange={(v) => setPasswordForm((p) => ({ ...p, newPassword: v }))} placeholder="New password" type="password" />
-                  <Input value={passwordForm.confirmPassword} onChange={(v) => setPasswordForm((p) => ({ ...p, confirmPassword: v }))} placeholder="Confirm new password" type="password" />
+                  <Input
+                    value={passwordForm.currentPassword}
+                    onChange={(v) =>
+                      setPasswordForm((p) => ({
+                        ...p,
+                        currentPassword: v,
+                      }))
+                    }
+                    placeholder="Current password"
+                    type="password"
+                  />
+
+                  <Input
+                    value={passwordForm.newPassword}
+                    onChange={(v) =>
+                      setPasswordForm((p) => ({
+                        ...p,
+                        newPassword: v,
+                      }))
+                    }
+                    placeholder="New password"
+                    type="password"
+                  />
+
+                  <Input
+                    value={passwordForm.confirmPassword}
+                    onChange={(v) =>
+                      setPasswordForm((p) => ({
+                        ...p,
+                        confirmPassword: v,
+                      }))
+                    }
+                    placeholder="Confirm new password"
+                    type="password"
+                  />
 
                   <button
                     type="submit"
@@ -943,30 +1035,33 @@ export default function SettingsPage() {
                     )}
                   </button>
                 </form>
-              </div>
+              </SettingsCard>
 
-              <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="mb-6 flex items-center gap-3">
-                  <div className="rounded-2xl bg-green-100 p-3 text-green-600">
-                    <Database className="h-5 w-5" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-slate-900">
-                    System Info
-                  </h3>
-                </div>
-
+              <SettingsCard
+                icon={<Database className="h-5 w-5" />}
+                title="System Info"
+                color="emerald"
+              >
                 <div className="space-y-4">
                   <StatusRow label="API Server" value="Online" color="green" />
-                  <StatusRow label="Database" value="Connected" color="green" />
+                  <StatusRow
+                    label="Database"
+                    value="Connected"
+                    color="green"
+                  />
                   <StatusRow label="Version" value="v1.0" color="blue" />
-                  <StatusRow label="Environment" value="Production" color="amber" />
+                  <StatusRow
+                    label="Environment"
+                    value="Production"
+                    color="amber"
+                  />
                 </div>
-              </div>
+              </SettingsCard>
             </div>
           </div>
-        </div>
-      </main>
-    </div>
+        )}
+      </div>
+    </AdminShell>
   );
 }
 
@@ -990,7 +1085,7 @@ function Input({
       disabled={disabled}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 outline-none transition disabled:cursor-not-allowed disabled:opacity-70 focus:border-[#1f3270] focus:bg-white"
+      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 outline-none transition disabled:cursor-not-allowed disabled:opacity-70 focus:border-blue-600 focus:bg-white"
     />
   );
 }
@@ -1028,32 +1123,46 @@ function EmptyText({ text }: { text: string }) {
   );
 }
 
-function CardHeader({
+function SettingsCard({
   icon,
   title,
   color,
+  children,
 }: {
   icon: ReactNode;
   title: string;
-  color: "blue" | "purple" | "emerald" | "indigo" | "sky";
+  color:
+    | "blue"
+    | "purple"
+    | "emerald"
+    | "indigo"
+    | "sky"
+    | "amber"
+    | "rose";
+  children: ReactNode;
 }) {
-  const colorClasses =
-    color === "blue"
-      ? "bg-blue-100 text-blue-600"
-      : color === "purple"
-      ? "bg-purple-100 text-purple-600"
-      : color === "emerald"
-      ? "bg-emerald-100 text-emerald-600"
-      : color === "sky"
-      ? "bg-sky-100 text-sky-600"
-      : "bg-indigo-100 text-indigo-600";
+  const colorClasses: Record<typeof color, string> = {
+    blue: "bg-blue-100 text-blue-600",
+    purple: "bg-purple-100 text-purple-600",
+    emerald: "bg-emerald-100 text-emerald-600",
+    indigo: "bg-indigo-100 text-indigo-600",
+    sky: "bg-sky-100 text-sky-600",
+    amber: "bg-amber-100 text-amber-600",
+    rose: "bg-rose-100 text-rose-600",
+  };
 
   return (
-    <div className="rounded-t-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="flex items-center gap-3">
-        <div className={`rounded-2xl p-3 ${colorClasses}`}>{icon}</div>
-        <h3 className="text-xl font-semibold text-slate-900">{title}</h3>
+    <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+      <div className="border-b border-slate-100 p-6">
+        <div className="flex items-center gap-3">
+          <div className={`rounded-2xl p-3 ${colorClasses[color]}`}>
+            {icon}
+          </div>
+          <h3 className="text-xl font-semibold text-slate-900">{title}</h3>
+        </div>
       </div>
+
+      <div className="p-6">{children}</div>
     </div>
   );
 }
@@ -1067,48 +1176,20 @@ function StatusRow({
   value: string;
   color: "green" | "blue" | "amber";
 }) {
-  const colorClasses =
-    color === "green"
-      ? "bg-emerald-100 text-emerald-700"
-      : color === "blue"
-      ? "bg-blue-100 text-blue-700"
-      : "bg-amber-100 text-amber-700";
+  const colorClasses: Record<"green" | "blue" | "amber", string> = {
+    green: "bg-emerald-100 text-emerald-700",
+    blue: "bg-blue-100 text-blue-700",
+    amber: "bg-amber-100 text-amber-700",
+  };
 
   return (
     <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
       <span className="text-sm text-slate-600">{label}</span>
       <span
-        className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${colorClasses}`}
+        className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${colorClasses[color]}`}
       >
         {value}
       </span>
     </div>
-  );
-}
-
-function SidebarItem({
-  label,
-  icon,
-  href,
-  active = false,
-}: {
-  label: string;
-  icon: ReactNode;
-  href: string;
-  active?: boolean;
-}) {
-  return (
-    <Link href={href}>
-      <div
-        className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-medium transition ${
-          active
-            ? "bg-white/15 text-white shadow"
-            : "text-blue-100/80 hover:bg-white/10 hover:text-white"
-        }`}
-      >
-        <span>{icon}</span>
-        <span>{label}</span>
-      </div>
-    </Link>
   );
 }
