@@ -38,6 +38,7 @@ type AdminShellProps = {
     | "maintenance"
     | "payments"
     | "communications"
+    | "AI Assistant"
     | "documents"
     | "insights"
     | "settings";
@@ -94,6 +95,12 @@ const menuItems = [
     key: "communications",
     label: "Messages",
     href: "/communications",
+    icon: <MessageCircle size={18} />,
+  },
+  {
+  key: "AI Assistance",
+    label: "Messages",
+    href: "/chatbot",
     icon: <MessageCircle size={18} />,
   },
   {

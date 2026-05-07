@@ -18,6 +18,7 @@ import {
   Wallet,
   X,
 } from "lucide-react";
+import TenantAIWidget from "@/components/TenantAIWidget";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
@@ -229,6 +230,7 @@ export default function TenantPaymentsPage() {
   }
 
   return (
+    <>
     <div className="min-h-screen bg-slate-100 px-4 py-6 md:px-6 md:py-8">
       <div className="mx-auto max-w-6xl space-y-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -541,6 +543,9 @@ export default function TenantPaymentsPage() {
         </div>
       )}
     </div>
+
+    <TenantAIWidget />
+        </>
   );
 }
 

@@ -16,9 +16,8 @@ import {
   CalendarDays,
   BadgeCheck,
   Wallet,
-  Clock3,
   ArrowRight,
-  Settings, 
+  Settings,
   Loader2,
   Building2,
   Phone,
@@ -30,6 +29,7 @@ import {
   Menu,
   X,
 } from "lucide-react";
+import TenantAIWidget from "@/components/TenantAIWidget";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
@@ -121,6 +121,7 @@ function formatMoney(value?: string | number | null) {
   if (value === null || value === undefined || value === "") return "$0";
   const num = Number(value);
   if (Number.isNaN(num)) return `$${value}`;
+
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
@@ -130,6 +131,7 @@ function formatMoney(value?: string | number | null) {
 
 function formatDate(value?: string | null) {
   if (!value) return "Not set";
+
   return new Date(value).toLocaleDateString("en-US", {
     year: "numeric",
     month: "short",
@@ -139,6 +141,7 @@ function formatDate(value?: string | null) {
 
 function getInitials(name?: string | null) {
   if (!name) return "TN";
+
   return name
     .split(" ")
     .map((part) => part[0])
@@ -192,8 +195,6 @@ function getMaintenanceBadge(status?: string | null) {
   }
 }
 
-
-
 export default function TenantPortalPage() {
   const router = useRouter();
 
@@ -205,8 +206,6 @@ export default function TenantPortalPage() {
   const [documents, setDocuments] = useState<TenantDocument[]>([]);
   const [error, setError] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -226,10 +225,14 @@ export default function TenantPortalPage() {
           router.replace("/dashboard");
           return;
         }
+
         if (role === "owner") {
           router.replace("/owner");
           return;
         }
+
+        router.replace("/");
+        return;
       }
 
       setCheckingAuth(false);
@@ -255,10 +258,10 @@ export default function TenantPortalPage() {
       const token = localStorage.getItem("token");
 
       const meRes = await fetch(`${API_URL}/api/auth/me`, {
+        cache: "no-store",
         headers: {
           Authorization: `Bearer ${token || ""}`,
         },
-        cache: "no-store",
       });
 
       const meData = await meRes.json().catch(() => null);
@@ -278,6 +281,7 @@ export default function TenantPortalPage() {
       setUser(currentUser);
 
       const tenantId = currentUser?.tenant?.id;
+
       if (!tenantId) {
         setPayments([]);
         setMaintenance([]);
@@ -292,13 +296,17 @@ export default function TenantPortalPage() {
             Authorization: `Bearer ${token || ""}`,
           },
         }),
-        fetch(`${API_URL}/api/maintenance`, {
+        fetch(`${API_URL}/api/tenant/maintenance`, {
           cache: "no-store",
-          headers: { Authorization: `Bearer ${token || ""}` },
+          headers: {
+            Authorization: `Bearer ${token || ""}`,
+          },
         }),
         fetch(`${API_URL}/api/documents`, {
           cache: "no-store",
-          headers: { Authorization: `Bearer ${token || ""}` },
+          headers: {
+            Authorization: `Bearer ${token || ""}`,
+          },
         }),
       ]);
 
@@ -306,22 +314,17 @@ export default function TenantPortalPage() {
       const maintenanceData = await maintenanceRes.json().catch(() => []);
       const documentsData = await documentsRes.json().catch(() => []);
 
-      const tenantPayments = Array.isArray(paymentsData)
-        ? paymentsData.filter((item: any) => {
-            const fullName = `${currentUser?.tenant?.firstName || ""} ${currentUser?.tenant?.lastName || ""}`.trim();
-            const leaseFullName = `${item?.lease?.tenant?.firstName || ""} ${item?.lease?.tenant?.lastName || ""}`.trim();
-            return fullName && leaseFullName && fullName === leaseFullName;
-          })
-        : [];
-
+      const tenantPayments = Array.isArray(paymentsData) ? paymentsData : [];
       const tenantMaintenance = Array.isArray(maintenanceData)
-        ? maintenanceData.filter((item: any) => item?.tenant?.id === tenantId)
+        ? maintenanceData
         : [];
 
       const tenantDocuments = Array.isArray(documentsData)
         ? documentsData.filter(
             (item: any) =>
-              item?.tenant?.id === tenantId || item?.accessibleToTenant === true
+              item?.tenant?.id === tenantId ||
+              item?.tenantId === tenantId ||
+              item?.accessibleToTenant === true
           )
         : [];
 
@@ -354,52 +357,42 @@ export default function TenantPortalPage() {
   const monthlyRent =
     currentLease?.rentAmount ?? user?.tenant?.unit?.monthlyRent ?? 0;
 
-
-
-
   const leaseStatus = String(
-  user?.tenant?.leaseStatus || currentLease?.status || ""
-).toUpperCase();
+    user?.tenant?.leaseStatus || currentLease?.status || ""
+  ).toUpperCase();
 
-const leaseEndDate = currentLease?.endDate || user?.tenant?.leaseEndDate || null;
+  const leaseEndDate =
+    currentLease?.endDate || user?.tenant?.leaseEndDate || null;
 
-const isLeaseEnded =
-  ["EXPIRED", "TERMINATED", "CANCELLED", "INACTIVE"].includes(leaseStatus) ||
-  (leaseEndDate ? new Date(leaseEndDate) < new Date() : false);
+  const isLeaseEnded =
+    ["EXPIRED", "TERMINATED", "CANCELLED", "INACTIVE"].includes(leaseStatus) ||
+    (leaseEndDate ? new Date(leaseEndDate) < new Date() : false);
 
-const activeMonthlyRent = isLeaseEnded ? 0 : Number(monthlyRent || 0);
+  const activeMonthlyRent = isLeaseEnded ? 0 : Number(monthlyRent || 0);
 
-const currentMonthPaidAmount = useMemo(() => {
-  const now = new Date();
-  const currentMonth = now.getMonth();
-  const currentYear = now.getFullYear();
+  const currentMonthPaidAmount = useMemo(() => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
 
-  return payments
-    .filter((p) => {
-      const status = String(p.status || "").toUpperCase();
-      const paymentDate = new Date(p.paymentDate);
+    return payments
+      .filter((p) => {
+        const status = String(p.status || "").toUpperCase();
+        const paymentDate = new Date(p.paymentDate);
 
-      return (
-        status === "PAID" &&
-        paymentDate.getMonth() === currentMonth &&
-        paymentDate.getFullYear() === currentYear
-      );
-    })
-    .reduce((sum, p) => sum + Number(p.amount || 0), 0);
-}, [payments]);
+        return (
+          status === "PAID" &&
+          paymentDate.getMonth() === currentMonth &&
+          paymentDate.getFullYear() === currentYear
+        );
+      })
+      .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+  }, [payments]);
 
-const remainingBalance = Math.max(
-  activeMonthlyRent - Number(currentMonthPaidAmount || 0),
-  0
-);
-
-
-
-
-
-
-
-
+  const remainingBalance = Math.max(
+    activeMonthlyRent - Number(currentMonthPaidAmount || 0),
+    0
+  );
 
   const pendingMaintenance = useMemo(
     () =>
@@ -414,7 +407,7 @@ const remainingBalance = Math.max(
   if (checkingAuth || loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#f4f7fb]">
-        <div className="flex items-center gap-3 rounded-3xl border border-slate-200 bg-white px-8 py-6 shadow-xl text-slate-700">
+        <div className="flex items-center gap-3 rounded-3xl border border-slate-200 bg-white px-8 py-6 text-slate-700 shadow-xl">
           <Loader2 className="h-5 w-5 animate-spin" />
           Loading tenant workspace...
         </div>
@@ -424,500 +417,595 @@ const remainingBalance = Math.max(
 
   if (error) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#f4f7fb] p-6">
-        <div className="w-full max-w-xl rounded-3xl border border-rose-200 bg-white p-8 shadow-xl">
-          <h2 className="text-2xl font-bold text-rose-600">Unable to load portal</h2>
-          <p className="mt-3 text-slate-600">{error}</p>
-          <button
-            onClick={loadTenantPortal}
-            className="mt-6 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700"
-          >
-            Retry
-          </button>
+      <>
+        <div className="flex min-h-screen items-center justify-center bg-[#f4f7fb] p-6">
+          <div className="w-full max-w-xl rounded-3xl border border-rose-200 bg-white p-8 shadow-xl">
+            <h2 className="text-2xl font-bold text-rose-600">
+              Unable to load portal
+            </h2>
+            <p className="mt-3 text-slate-600">{error}</p>
+            <button
+              onClick={loadTenantPortal}
+              className="mt-6 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700"
+            >
+              Retry
+            </button>
+          </div>
         </div>
-      </div>
+
+        <TenantAIWidget />
+      </>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#f4f7fb] text-slate-900">
-      <div className="flex min-h-screen">
-        {mobileMenuOpen && (
-  <div className="fixed inset-0 z-50 lg:hidden">
-    <div
-      className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-      onClick={() => setMobileMenuOpen(false)}
-    />
-
-    <aside className="absolute left-0 top-0 flex h-full w-80 max-w-[85vw] flex-col justify-between bg-gradient-to-b from-[#102a67] via-[#173d8e] to-[#0f1f45] text-white shadow-2xl">
-      <div>
-        <div className="flex items-center justify-between border-b border-white/10 px-6 py-6">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">The House Hub</h1>
-            <p className="mt-1 text-sm text-blue-100/70">
-              Premium Tenant Workspace
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setMobileMenuOpen(false)}
-            className="rounded-2xl bg-white/10 p-2 text-white hover:bg-white/20"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        <div className="px-5 py-5">
-          <div className="rounded-3xl border border-white/10 bg-white/10 p-5 backdrop-blur">
-            <div className="flex items-center gap-4">
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/15 text-lg font-bold text-white">
-                {initials}
-              </div>
-              <div>
-                <p className="text-base font-semibold">{fullName}</p>
-                <p className="text-sm text-blue-100/70">
-                  {user?.email || user?.tenant?.email || "Tenant"}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <nav className="px-4 pb-6">
-          <p className="mb-3 px-3 text-xs font-semibold uppercase tracking-widest text-blue-200/50">
-            Tenant Menu
-          </p>
-
-          <div className="space-y-2" onClick={() => setMobileMenuOpen(false)}>
-            <SidebarItem label="Overview" icon={<Home size={18} />} active href="/tenant" />
-            <SidebarItem label="Payments" icon={<CreditCard size={18} />} href="/tenant/payments" />
-            <SidebarItem label="Maintenance" icon={<Wrench size={18} />} href="/tenant/maintenance" />
-            <SidebarItem label="Documents" icon={<FileText size={18} />} href="/tenant/documents" />
-            <TenantNav label="Contact Landlord" href="/tenant/contact" icon={<MessageCircle size={18} />} />
-            <SidebarItem label="Notifications" icon={<Bell size={18} />} href="/tenant/notifications" />
-            <TenantNav label="Settings" href="/tenant/settings" icon={<Settings size={18} />} />
-          </div>
-        </nav>
-      </div>
-
-      <div className="border-t border-white/10 px-6 py-6">
-        <button
-          onClick={handleLogout}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-red-200/20 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-100 transition hover:bg-red-500/20"
-        >
-          <LogOut size={16} />
-          Logout
-        </button>
-      </div>
-    </aside>
-  </div>
-)}
-        <aside className="fixed inset-y-0 left-0 z-40 hidden w-80 shrink-0 flex-col justify-between bg-gradient-to-b from-[#102a67] via-[#173d8e] to-[#0f1f45] text-white shadow-2xl lg:flex">
-          <div>
-            <div className="border-b border-white/10 px-8 py-8">
-              <h1 className="text-3xl font-bold tracking-tight">The House Hub</h1>
-              <p className="mt-2 text-sm text-blue-100/70">
-                Premium Tenant Workspace
-              </p>
-            </div>
-
-            <div className="px-6 py-6">
-              <div className="rounded-3xl border border-white/10 bg-white/10 p-5 backdrop-blur">
-                <div className="flex items-center gap-4">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/15 text-lg font-bold text-white">
-                    {initials}
-                  </div>
-                  <div>
-                    <p className="text-base font-semibold">{fullName}</p>
-                    <p className="text-sm text-blue-100/70">
-                      {user?.email || user?.tenant?.email || "Tenant"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <nav className="px-4 pb-6">
-              <p className="mb-3 px-3 text-xs font-semibold uppercase tracking-widest text-blue-200/50">
-                Tenant Menu
-              </p>
-
-              <div className="space-y-2">
-                <SidebarItem label="Overview" icon={<Home size={18} />} active href="/tenant" />
-                <SidebarItem label="Payments" icon={<CreditCard size={18} />} href="/tenant/payments" />
-                <SidebarItem label="Maintenance" icon={<Wrench size={18} />} href="/tenant/maintenance" />
-                <SidebarItem label="Documents" icon={<FileText size={18} />} href="/tenant/documents" />
-                <TenantNav label="Contact Landlord" href="/tenant/contact" icon={<MessageCircle size={18} />} />
-                <SidebarItem label="Notifications" icon={<Bell size={18} />} href="/tenant/notifications" />
-                <TenantNav label="Settings" href="/tenant/settings" icon={<Settings size={18} />}  />
-              </div>
-            </nav>
-          </div>
-
-          <div className="border-t border-white/10 px-6 py-6">
-            <button
-              onClick={handleLogout}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl border border-red-200/20 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-100 transition hover:bg-red-500/20"
-            >
-              <LogOut size={16} />
-              Logout
-            </button>
-          </div>
-        </aside>
-
-        <main className="min-h-screen flex-1 lg:ml-80">
-
-          <div className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-200 bg-white/90 px-4 py-4 backdrop-blur lg:hidden">
-  <div>
-    <p className="text-sm font-semibold text-slate-900">The House Hub</p>
-    <p className="text-xs text-slate-500">Tenant Workspace</p>
-  </div>
-
-  <button
-    type="button"
-    onClick={() => setMobileMenuOpen(true)}
-    className="rounded-2xl border border-slate-200 bg-white p-3 text-slate-700 shadow-sm"
-  >
-    <Menu className="h-5 w-5" />
-  </button>
-</div>
-          <div className="border-b border-slate-200 bg-white/80 px-6 py-6 backdrop-blur md:px-8">
-            <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
-              <div>
-                <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700">
-                  <Sparkles className="h-4 w-4" />
-                  Tenant Experience
-                </div>
-
-                <h2 className="mt-4 text-4xl font-bold tracking-tight text-slate-900">
-                  Welcome back, {user?.tenant?.firstName || "Tenant"}
-                </h2>
-                <p className="mt-3 max-w-3xl text-base leading-7 text-slate-500">
-                  Manage your home, payments, service requests, and important documents
-                  from one modern tenant dashboard.
-                </p>
-              </div>
-
-              <div className="rounded-3xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
-                  Current Lease
-                </p>
-                <div className="mt-3">
-                  <span
-                    className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getLeaseBadge(
-                      user?.tenant?.leaseStatus || currentLease?.status
-                    )}`}
-                  >
-                    {user?.tenant?.leaseStatus || currentLease?.status || "N/A"}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="p-6 md:p-8">
-            <section className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-              <KpiCard
-                title="Monthly Rent"
-                value={formatMoney(activeMonthlyRent)}
-                subtitle="Current rental amount"
-                icon={<Wallet className="h-5 w-5" />}
-                accent="blue"
+    <>
+      <div className="min-h-screen bg-[#f4f7fb] text-slate-900">
+        <div className="flex min-h-screen">
+          {mobileMenuOpen && (
+            <div className="fixed inset-0 z-50 lg:hidden">
+              <div
+                className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+                onClick={() => setMobileMenuOpen(false)}
               />
-              <KpiCard
+
+              <aside className="absolute left-0 top-0 flex h-full w-80 max-w-[85vw] flex-col justify-between bg-gradient-to-b from-[#102a67] via-[#173d8e] to-[#0f1f45] text-white shadow-2xl">
+                <div>
+                  <div className="flex items-center justify-between border-b border-white/10 px-6 py-6">
+                    <div>
+                      <h1 className="text-2xl font-bold tracking-tight">
+                        The House Hub
+                      </h1>
+                      <p className="mt-1 text-sm text-blue-100/70">
+                        Premium Tenant Workspace
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="rounded-2xl bg-white/10 p-2 text-white hover:bg-white/20"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+
+                  <div className="px-5 py-5">
+                    <div className="rounded-3xl border border-white/10 bg-white/10 p-5 backdrop-blur">
+                      <div className="flex items-center gap-4">
+                        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/15 text-lg font-bold text-white">
+                          {initials}
+                        </div>
+                        <div>
+                          <p className="text-base font-semibold">{fullName}</p>
+                          <p className="text-sm text-blue-100/70">
+                            {user?.email || user?.tenant?.email || "Tenant"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <nav className="px-4 pb-6">
+                    <p className="mb-3 px-3 text-xs font-semibold uppercase tracking-widest text-blue-200/50">
+                      Tenant Menu
+                    </p>
+
+                    <div
+                      className="space-y-2"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <SidebarItem
+                        label="Overview"
+                        icon={<Home size={18} />}
+                        active
+                        href="/tenant"
+                      />
+                      <SidebarItem
+                        label="Payments"
+                        icon={<CreditCard size={18} />}
+                        href="/tenant/payments"
+                      />
+                      <SidebarItem
+                        label="Maintenance"
+                        icon={<Wrench size={18} />}
+                        href="/tenant/maintenance"
+                      />
+                      <SidebarItem
+                        label="Documents"
+                        icon={<FileText size={18} />}
+                        href="/tenant/documents"
+                      />
+                      <SidebarItem
+                        label="AI Assistant"
+                        icon={<Sparkles size={18} />}
+                        href="/tenant/chatbot"
+                      />
+                      <TenantNav
+                        label="Contact Landlord"
+                        href="/tenant/contact"
+                        icon={<MessageCircle size={18} />}
+                      />
+                      <SidebarItem
+                        label="Notifications"
+                        icon={<Bell size={18} />}
+                        href="/tenant/notifications"
+                      />
+                      <TenantNav
+                        label="Settings"
+                        href="/tenant/settings"
+                        icon={<Settings size={18} />}
+                      />
+                    </div>
+                  </nav>
+                </div>
+
+                <div className="border-t border-white/10 px-6 py-6">
+                  <button
+                    onClick={handleLogout}
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl border border-red-200/20 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-100 transition hover:bg-red-500/20"
+                  >
+                    <LogOut size={16} />
+                    Logout
+                  </button>
+                </div>
+              </aside>
+            </div>
+          )}
+
+          <aside className="fixed inset-y-0 left-0 z-40 hidden w-80 shrink-0 flex-col justify-between bg-gradient-to-b from-[#102a67] via-[#173d8e] to-[#0f1f45] text-white shadow-2xl lg:flex">
+            <div>
+              <div className="border-b border-white/10 px-8 py-8">
+                <h1 className="text-3xl font-bold tracking-tight">
+                  The House Hub
+                </h1>
+                <p className="mt-2 text-sm text-blue-100/70">
+                  Premium Tenant Workspace
+                </p>
+              </div>
+
+              <div className="px-6 py-6">
+                <div className="rounded-3xl border border-white/10 bg-white/10 p-5 backdrop-blur">
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/15 text-lg font-bold text-white">
+                      {initials}
+                    </div>
+                    <div>
+                      <p className="text-base font-semibold">{fullName}</p>
+                      <p className="text-sm text-blue-100/70">
+                        {user?.email || user?.tenant?.email || "Tenant"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <nav className="px-4 pb-6">
+                <p className="mb-3 px-3 text-xs font-semibold uppercase tracking-widest text-blue-200/50">
+                  Tenant Menu
+                </p>
+
+                <div className="space-y-2">
+                  <SidebarItem
+                    label="Overview"
+                    icon={<Home size={18} />}
+                    active
+                    href="/tenant"
+                  />
+                  <SidebarItem
+                    label="Payments"
+                    icon={<CreditCard size={18} />}
+                    href="/tenant/payments"
+                  />
+                  <SidebarItem
+                    label="Maintenance"
+                    icon={<Wrench size={18} />}
+                    href="/tenant/maintenance"
+                  />
+                  <SidebarItem
+                    label="Documents"
+                    icon={<FileText size={18} />}
+                    href="/tenant/documents"
+                  />
+                  <SidebarItem
+                    label="AI Assistant"
+                    icon={<Sparkles size={18} />}
+                    href="/tenant/chatbot"
+                  />
+                  <TenantNav
+                    label="Contact Landlord"
+                    href="/tenant/contact"
+                    icon={<MessageCircle size={18} />}
+                  />
+                  <SidebarItem
+                    label="Notifications"
+                    icon={<Bell size={18} />}
+                    href="/tenant/notifications"
+                  />
+                  <TenantNav
+                    label="Settings"
+                    href="/tenant/settings"
+                    icon={<Settings size={18} />}
+                  />
+                </div>
+              </nav>
+            </div>
+
+            <div className="border-t border-white/10 px-6 py-6">
+              <button
+                onClick={handleLogout}
+                className="flex w-full items-center justify-center gap-2 rounded-2xl border border-red-200/20 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-100 transition hover:bg-red-500/20"
+              >
+                <LogOut size={16} />
+                Logout
+              </button>
+            </div>
+          </aside>
+
+          <main className="min-h-screen flex-1 lg:ml-80">
+            <div className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-200 bg-white/90 px-4 py-4 backdrop-blur lg:hidden">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">
+                  The House Hub
+                </p>
+                <p className="text-xs text-slate-500">Tenant Workspace</p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(true)}
+                className="rounded-2xl border border-slate-200 bg-white p-3 text-slate-700 shadow-sm"
+              >
+                <Menu className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="border-b border-slate-200 bg-white/80 px-6 py-6 backdrop-blur md:px-8">
+              <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+                <div>
+                  <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700">
+                    <Sparkles className="h-4 w-4" />
+                    Tenant Experience
+                  </div>
+
+                  <h2 className="mt-4 text-3xl font-bold tracking-tight text-slate-900 md:text-4xl">
+                    Welcome back, {user?.tenant?.firstName || "Tenant"}
+                  </h2>
+                  <p className="mt-3 max-w-3xl text-base leading-7 text-slate-500">
+                    Manage your home, payments, service requests, and important
+                    documents from one modern tenant dashboard.
+                  </p>
+                </div>
+
+                <div className="rounded-3xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+                  <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
+                    Current Lease
+                  </p>
+                  <div className="mt-3">
+                    <span
+                      className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getLeaseBadge(
+                        user?.tenant?.leaseStatus || currentLease?.status
+                      )}`}
+                    >
+                      {user?.tenant?.leaseStatus ||
+                        currentLease?.status ||
+                        "N/A"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 md:p-8">
+              <section className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-5">
+                <KpiCard
+                  title="Monthly Rent"
+                  value={formatMoney(activeMonthlyRent)}
+                  subtitle="Current rental amount"
+                  icon={<Wallet className="h-5 w-5" />}
+                  accent="blue"
+                />
+                <KpiCard
                   title="Paid Amount"
                   value={formatMoney(currentMonthPaidAmount)}
                   subtitle="Approved rent payments"
                   icon={<BadgeCheck className="h-5 w-5" />}
                   accent="emerald"
                 />
-              <KpiCard
-  title="Remaining Balance"
-  value={formatMoney(remainingBalance)}
-  subtitle="Amount left to pay"
-  icon={<Wallet className="h-5 w-5" />}
-  accent="amber"
-/>
-              <KpiCard
-                title="Open Requests"
-                value={String(pendingMaintenance)}
-                subtitle="Pending maintenance issues"
-                icon={<Wrench className="h-5 w-5" />}
-                accent="amber"
-              />
-              <KpiCard
-                title="Available Documents"
-                value={String(documents.length)}
-                subtitle="Files accessible to you"
-                icon={<FileText className="h-5 w-5" />}
-                accent="indigo"
-              />
-            </section>
+                <KpiCard
+                  title="Remaining Balance"
+                  value={formatMoney(remainingBalance)}
+                  subtitle="Amount left to pay"
+                  icon={<Wallet className="h-5 w-5" />}
+                  accent="amber"
+                />
+                <KpiCard
+                  title="Open Requests"
+                  value={String(pendingMaintenance)}
+                  subtitle="Pending maintenance issues"
+                  icon={<Wrench className="h-5 w-5" />}
+                  accent="amber"
+                />
+                <KpiCard
+                  title="Available Documents"
+                  value={String(documents.length)}
+                  subtitle="Files accessible to you"
+                  icon={<FileText className="h-5 w-5" />}
+                  accent="indigo"
+                />
+              </section>
 
-            <section className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-3">
-              <div className="xl:col-span-2 rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-2xl font-semibold text-slate-900">
-                      Your Home & Lease Summary
-                    </h3>
-                    <p className="mt-1 text-sm text-slate-500">
-                      A clear overview of your property, unit, and lease details.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-6 grid gap-4 md:grid-cols-2">
-                  <InfoCard
-                    icon={<Building2 className="h-5 w-5" />}
-                    label="Property"
-                    value={
-                      user?.tenant?.property?.name ||
-                      user?.tenant?.property?.code ||
-                      "Not assigned"
-                    }
-                  />
-                  <InfoCard
-                    icon={<DoorOpen className="h-5 w-5" />}
-                    label="Unit"
-                    value={
-                      user?.tenant?.unit?.unitCode
-                        ? `${user.tenant.unit.unitCode}${
-                            user?.tenant?.unit?.unitName
-                              ? ` — ${user.tenant.unit.unitName}`
-                              : ""
-                          }`
-                        : "No unit assigned"
-                    }
-                  />
-                  <InfoCard
-                    icon={<MapPin className="h-5 w-5" />}
-                    label="Address"
-                    value={user?.tenant?.property?.addressLine1 || "No address available"}
-                  />
-                  <InfoCard
-                    icon={<CalendarDays className="h-5 w-5" />}
-                    label="Lease Period"
-                    value={`${formatDate(
-                      currentLease?.startDate || user?.tenant?.leaseStartDate
-                    )} → ${formatDate(
-                      currentLease?.endDate || user?.tenant?.leaseEndDate
-                    )}`}
-                  />
-                  <InfoCard
-                    icon={<ShieldCheck className="h-5 w-5" />}
-                    label="Occupancy Status"
-                    value={user?.tenant?.unit?.occupancyStatus || "N/A"}
-                  />
-                  <InfoCard
-                    icon={<Layers3 className="h-5 w-5" />}
-                    label="Floor / Beds / Baths"
-                    value={`Floor ${user?.tenant?.unit?.floor ?? "—"} • ${
-                      user?.tenant?.unit?.bedrooms ?? "—"
-                    } bed • ${user?.tenant?.unit?.bathrooms ?? "—"} bath`}
-                  />
-                </div>
-              </div>
-
-              <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-                <h3 className="text-2xl font-semibold text-slate-900">
-                  Contact Profile
-                </h3>
-                <p className="mt-1 text-sm text-slate-500">
-                  Your account identity and contact info.
-                </p>
-
-                <div className="mt-6 space-y-4">
-                  <ProfileRow
-                    icon={<UserCircle2 className="h-5 w-5 text-slate-400" />}
-                    label="Full Name"
-                    value={fullName}
-                  />
-                  <ProfileRow
-                    icon={<Mail className="h-5 w-5 text-slate-400" />}
-                    label="Email"
-                    value={user?.tenant?.email || user?.email || "N/A"}
-                  />
-                  <ProfileRow
-                    icon={<Phone className="h-5 w-5 text-slate-400" />}
-                    label="Phone"
-                    value={user?.tenant?.phone || "N/A"}
-                  />
-                </div>
-              </div>
-            </section>
-
-            <section className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-2">
-              <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-2xl font-semibold text-slate-900">
-                      Recent Payments
-                    </h3>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Latest recorded transactions on your account.
-                    </p>
-                  </div>
-
-                  <Link
-                    href="/tenant/payments"
-                    className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700"
-                  >
-                    View all
-                    <ArrowRight className="h-4 w-4" />
-                  </Link>
-                </div>
-
-                <div className="mt-6 space-y-4">
-                  {payments.length === 0 ? (
-                    <EmptyState text="No payment records found yet." />
-                  ) : (
-                    payments.slice(0, 4).map((payment) => (
-                      <div
-                        key={payment.id}
-                        className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4"
-                      >
-                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                          <div>
-                            <p className="font-semibold text-slate-900">
-                              {formatMoney(payment.amount)}
-                            </p>
-                            <p className="mt-1 text-sm text-slate-500">
-                              {formatDate(payment.paymentDate)} • {payment.paymentMethod}
-                            </p>
-                          </div>
-
-                          <span
-                            className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold ${getPaymentBadge(
-                              payment.status
-                            )}`}
-                          >
-                            {payment.status}
-                          </span>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                {latestPayment && (
-                  <div className="mt-6 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-5 text-white">
-                    <p className="text-sm text-blue-100">Latest payment</p>
-                    <p className="mt-1 text-2xl font-bold">
-                      {formatMoney(latestPayment.amount)}
-                    </p>
-                    <p className="mt-1 text-sm text-blue-100">
-                      {formatDate(latestPayment.paymentDate)}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-2xl font-semibold text-slate-900">
-                      Maintenance Requests
-                    </h3>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Follow the progress of your service requests.
-                    </p>
-                  </div>
-
-                  <Link
-                    href="/tenant/maintenance"
-                    className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700"
-                  >
-                    View all
-                    <ArrowRight className="h-4 w-4" />
-                  </Link>
-                </div>
-
-                <div className="mt-6 space-y-4">
-                  {maintenance.length === 0 ? (
-                    <EmptyState text="No maintenance requests found." />
-                  ) : (
-                    maintenance.slice(0, 4).map((item) => (
-                      <div
-                        key={item.id}
-                        className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4"
-                      >
-                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                          <div>
-                            <p className="font-semibold text-slate-900">{item.title}</p>
-                            <p className="mt-1 text-sm text-slate-500">
-                              {item.category || "GENERAL"} • {formatDate(item.createdAt)}
-                            </p>
-                          </div>
-
-                          <span
-                            className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold ${getMaintenanceBadge(
-                              item.status
-                            )}`}
-                          >
-                            {item.status || "OPEN"}
-                          </span>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </section>
-
-            <section className="mt-8 rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
+              <section className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-3">
+                <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm xl:col-span-2">
                   <h3 className="text-2xl font-semibold text-slate-900">
-                    Your Documents
+                    Your Home & Lease Summary
                   </h3>
                   <p className="mt-1 text-sm text-slate-500">
-                    Access lease documents, notices, and other shared files.
+                    A clear overview of your property, unit, and lease details.
                   </p>
+
+                  <div className="mt-6 grid gap-4 md:grid-cols-2">
+                    <InfoCard
+                      icon={<Building2 className="h-5 w-5" />}
+                      label="Property"
+                      value={
+                        user?.tenant?.property?.name ||
+                        user?.tenant?.property?.code ||
+                        "Not assigned"
+                      }
+                    />
+                    <InfoCard
+                      icon={<DoorOpen className="h-5 w-5" />}
+                      label="Unit"
+                      value={
+                        user?.tenant?.unit?.unitCode
+                          ? `${user.tenant.unit.unitCode}${
+                              user?.tenant?.unit?.unitName
+                                ? ` — ${user.tenant.unit.unitName}`
+                                : ""
+                            }`
+                          : "No unit assigned"
+                      }
+                    />
+                    <InfoCard
+                      icon={<MapPin className="h-5 w-5" />}
+                      label="Address"
+                      value={
+                        user?.tenant?.property?.addressLine1 ||
+                        "No address available"
+                      }
+                    />
+                    <InfoCard
+                      icon={<CalendarDays className="h-5 w-5" />}
+                      label="Lease Period"
+                      value={`${formatDate(
+                        currentLease?.startDate || user?.tenant?.leaseStartDate
+                      )} → ${formatDate(
+                        currentLease?.endDate || user?.tenant?.leaseEndDate
+                      )}`}
+                    />
+                    <InfoCard
+                      icon={<ShieldCheck className="h-5 w-5" />}
+                      label="Occupancy Status"
+                      value={user?.tenant?.unit?.occupancyStatus || "N/A"}
+                    />
+                    <InfoCard
+                      icon={<Layers3 className="h-5 w-5" />}
+                      label="Floor / Beds / Baths"
+                      value={`Floor ${user?.tenant?.unit?.floor ?? "—"} • ${
+                        user?.tenant?.unit?.bedrooms ?? "—"
+                      } bed • ${user?.tenant?.unit?.bathrooms ?? "—"} bath`}
+                    />
+                  </div>
                 </div>
 
-                <Link
-                  href="/tenant/documents"
-                  className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700"
-                >
-                  Open documents
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </div>
+                <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+                  <h3 className="text-2xl font-semibold text-slate-900">
+                    Contact Profile
+                  </h3>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Your account identity and contact info.
+                  </p>
 
-              <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {documents.length === 0 ? (
-                  <div className="md:col-span-2 xl:col-span-3">
-                    <EmptyState text="No documents available yet." />
+                  <div className="mt-6 space-y-4">
+                    <ProfileRow
+                      icon={<UserCircle2 className="h-5 w-5 text-slate-400" />}
+                      label="Full Name"
+                      value={fullName}
+                    />
+                    <ProfileRow
+                      icon={<Mail className="h-5 w-5 text-slate-400" />}
+                      label="Email"
+                      value={user?.tenant?.email || user?.email || "N/A"}
+                    />
+                    <ProfileRow
+                      icon={<Phone className="h-5 w-5 text-slate-400" />}
+                      label="Phone"
+                      value={user?.tenant?.phone || "N/A"}
+                    />
                   </div>
-                ) : (
-                  documents.slice(0, 6).map((doc) => (
-                    <div
-                      key={doc.id}
-                      className="rounded-2xl border border-slate-200 bg-slate-50 p-5 transition hover:-translate-y-0.5 hover:shadow-sm"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="font-semibold text-slate-900">
-                            {doc.documentName}
-                          </p>
-                          <p className="mt-1 text-sm text-slate-500">{doc.type}</p>
-                        </div>
+                </div>
+              </section>
 
-                        <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600">
-                          {formatDate(doc.createdAt)}
-                        </span>
-                      </div>
+              <section className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-2">
+                <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <h3 className="text-2xl font-semibold text-slate-900">
+                        Recent Payments
+                      </h3>
+                      <p className="mt-1 text-sm text-slate-500">
+                        Latest recorded transactions on your account.
+                      </p>
                     </div>
-                  ))
-                )}
-              </div>
-            </section>
-          </div>
-        </main>
+
+                    <Link
+                      href="/tenant/payments"
+                      className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700"
+                    >
+                      View all
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  </div>
+
+                  <div className="mt-6 space-y-4">
+                    {payments.length === 0 ? (
+                      <EmptyState text="No payment records found yet." />
+                    ) : (
+                      payments.slice(0, 4).map((payment) => (
+                        <div
+                          key={payment.id}
+                          className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4"
+                        >
+                          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                            <div>
+                              <p className="font-semibold text-slate-900">
+                                {formatMoney(payment.amount)}
+                              </p>
+                              <p className="mt-1 text-sm text-slate-500">
+                                {formatDate(payment.paymentDate)} •{" "}
+                                {payment.paymentMethod}
+                              </p>
+                            </div>
+
+                            <span
+                              className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold ${getPaymentBadge(
+                                payment.status
+                              )}`}
+                            >
+                              {payment.status}
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {latestPayment && (
+                    <div className="mt-6 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-5 text-white">
+                      <p className="text-sm text-blue-100">Latest payment</p>
+                      <p className="mt-1 text-2xl font-bold">
+                        {formatMoney(latestPayment.amount)}
+                      </p>
+                      <p className="mt-1 text-sm text-blue-100">
+                        {formatDate(latestPayment.paymentDate)}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <h3 className="text-2xl font-semibold text-slate-900">
+                        Maintenance Requests
+                      </h3>
+                      <p className="mt-1 text-sm text-slate-500">
+                        Follow the progress of your service requests.
+                      </p>
+                    </div>
+
+                    <Link
+                      href="/tenant/maintenance"
+                      className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700"
+                    >
+                      View all
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  </div>
+
+                  <div className="mt-6 space-y-4">
+                    {maintenance.length === 0 ? (
+                      <EmptyState text="No maintenance requests found." />
+                    ) : (
+                      maintenance.slice(0, 4).map((item) => (
+                        <div
+                          key={item.id}
+                          className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4"
+                        >
+                          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                            <div>
+                              <p className="font-semibold text-slate-900">
+                                {item.title}
+                              </p>
+                              <p className="mt-1 text-sm text-slate-500">
+                                {item.category || "GENERAL"} •{" "}
+                                {formatDate(item.createdAt)}
+                              </p>
+                            </div>
+
+                            <span
+                              className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold ${getMaintenanceBadge(
+                                item.status
+                              )}`}
+                            >
+                              {item.status || "OPEN"}
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </section>
+
+              <section className="mt-8 rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <h3 className="text-2xl font-semibold text-slate-900">
+                      Your Documents
+                    </h3>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Access lease documents, notices, and other shared files.
+                    </p>
+                  </div>
+
+                  <Link
+                    href="/tenant/documents"
+                    className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700"
+                  >
+                    Open documents
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
+
+                <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {documents.length === 0 ? (
+                    <div className="md:col-span-2 xl:col-span-3">
+                      <EmptyState text="No documents available yet." />
+                    </div>
+                  ) : (
+                    documents.slice(0, 6).map((doc) => (
+                      <div
+                        key={doc.id}
+                        className="rounded-2xl border border-slate-200 bg-slate-50 p-5 transition hover:-translate-y-0.5 hover:shadow-sm"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="font-semibold text-slate-900">
+                              {doc.documentName}
+                            </p>
+                            <p className="mt-1 text-sm text-slate-500">
+                              {doc.type}
+                            </p>
+                          </div>
+
+                          <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600">
+                            {formatDate(doc.createdAt)}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </section>
+            </div>
+          </main>
+        </div>
       </div>
-    </div>
+
+      <TenantAIWidget />
+    </>
   );
 }
 
@@ -971,12 +1059,18 @@ function KpiCard({
   return (
     <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
       <div className="flex items-start justify-between">
-        <div className={`h-2 w-16 rounded-full bg-gradient-to-r ${accentMap[accent]}`} />
-        <div className="rounded-2xl bg-slate-50 p-3 text-slate-500">{icon}</div>
+        <div
+          className={`h-2 w-16 rounded-full bg-gradient-to-r ${accentMap[accent]}`}
+        />
+        <div className="rounded-2xl bg-slate-50 p-3 text-slate-500">
+          {icon}
+        </div>
       </div>
 
       <p className="mt-5 text-sm font-medium text-slate-500">{title}</p>
-      <p className="mt-3 text-3xl font-bold tracking-tight text-slate-900">{value}</p>
+      <p className="mt-3 text-3xl font-bold tracking-tight text-slate-900">
+        {value}
+      </p>
       <p className="mt-3 text-sm text-slate-500">{subtitle}</p>
     </div>
   );
@@ -1046,7 +1140,9 @@ function ProfileRow({
     <div className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-4">
       {icon}
       <div>
-        <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
+        <p className="text-xs uppercase tracking-wide text-slate-500">
+          {label}
+        </p>
         <p className="font-medium text-slate-900">{value}</p>
       </div>
     </div>
