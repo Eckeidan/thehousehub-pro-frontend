@@ -90,12 +90,7 @@ const menuItems = [
     href: "/communications",
     icon: <MessageCircle size={18} />,
   },
-  {
-  key: "AI Assistance",
-    label: "Messages",
-    href: "/chatbot",
-    icon: <MessageCircle size={18} />,
-  },
+  
   {
     key: "documents",
     label: "Documents",

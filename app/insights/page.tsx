@@ -22,8 +22,7 @@ import {
 import AdminShell from "@/components/AdminShell";
 
 const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL ||
-  "https://propertyos-backend.onrender.com";
+  process.env.NEXT_PUBLIC_API_URL || "https://propertyos-backend.onrender.com";
 
 type StoredUser = {
   id?: string;
@@ -45,6 +44,8 @@ type Insight = {
     | "DOCUMENTS"
     | "OCCUPANCY"
     | "COMPLIANCE";
+  reviewUrl?: string;
+  buttonLabel?: string;
 };
 
 type InsightsResponse = {
@@ -74,7 +75,6 @@ export default function InsightsPage() {
 
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [user, setUser] = useState<StoredUser | null>(null);
-
   const [data, setData] = useState<InsightsResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -98,11 +98,28 @@ export default function InsightsPage() {
     });
   }
 
-  const handleUnauthorized = () => {
+  function handleUnauthorized() {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     router.replace("/");
-  };
+  }
+
+  function getFallbackReviewUrl(category: Insight["category"]) {
+    switch (category) {
+      case "FINANCIAL":
+        return "/payments";
+      case "MAINTENANCE":
+        return "/maintenance";
+      case "DOCUMENTS":
+        return "/documents";
+      case "OCCUPANCY":
+        return "/properties";
+      case "COMPLIANCE":
+        return "/dashboard";
+      default:
+        return "/dashboard";
+    }
+  }
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -115,10 +132,7 @@ export default function InsightsPage() {
 
     try {
       const parsedUser: StoredUser = JSON.parse(userRaw);
-
-      const role = String(parsedUser?.role || "")
-        .trim()
-        .toLowerCase();
+      const role = String(parsedUser?.role || "").trim().toLowerCase();
 
       if (role === "tenant") {
         router.replace("/tenant");
@@ -129,10 +143,8 @@ export default function InsightsPage() {
       setCheckingAuth(false);
     } catch (error) {
       console.error("Insights auth error:", error);
-
       localStorage.removeItem("token");
       localStorage.removeItem("user");
-
       router.replace("/");
     }
   }, [router]);
@@ -170,22 +182,18 @@ export default function InsightsPage() {
       }
 
       const contentType = res.headers.get("content-type") || "";
-
       let result: any = null;
 
       if (contentType.includes("application/json")) {
         result = await res.json();
       } else {
         const rawText = await res.text();
-
         throw new Error(rawText || "Invalid response from insights API");
       }
 
       if (!res.ok) {
         throw new Error(
-          result?.error ||
-            result?.message ||
-            "Failed to load insights"
+          result?.error || result?.message || "Failed to load insights"
         );
       }
 
@@ -205,20 +213,18 @@ export default function InsightsPage() {
 
   useEffect(() => {
     if (checkingAuth) return;
-
     fetchInsights();
   }, [checkingAuth]);
 
   const stats = data?.stats;
   const insights = data?.insights || [];
   const recommendations = data?.recommendations || [];
-
   const isError = notification.type === "error";
 
   if (checkingAuth) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-100 p-8">
-        <div className="rounded-3xl border border-slate-200 bg-white px-8 py-6 shadow-xl text-slate-700">
+        <div className="rounded-3xl border border-slate-200 bg-white px-8 py-6 text-slate-700 shadow-xl">
           <div className="flex items-center gap-2">
             <Loader2 className="h-5 w-5 animate-spin" />
             Checking session...
@@ -236,10 +242,16 @@ export default function InsightsPage() {
       subtitle="Smart recommendations and portfolio observations generated from your current organization data."
       actions={
         <button
+          type="button"
           onClick={fetchInsights}
-          className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
+          disabled={loading}
+          className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          <Sparkles className="h-4 w-4" />
+          {loading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Sparkles className="h-4 w-4" />
+          )}
           Refresh Analysis
         </button>
       }
@@ -249,9 +261,7 @@ export default function InsightsPage() {
           <div className="fixed right-4 top-4 z-[110] w-[calc(100%-2rem)] max-w-md sm:right-6 sm:top-6">
             <div
               className={`rounded-3xl border bg-white shadow-2xl ${
-                isError
-                  ? "border-red-200"
-                  : "border-emerald-200"
+                isError ? "border-red-200" : "border-emerald-200"
               }`}
             >
               <div className="flex items-start gap-3 p-5">
@@ -272,9 +282,7 @@ export default function InsightsPage() {
                 <div className="flex-1">
                   <p
                     className={`text-sm font-semibold ${
-                      isError
-                        ? "text-red-700"
-                        : "text-emerald-700"
+                      isError ? "text-red-700" : "text-emerald-700"
                     }`}
                   >
                     {notification.title}
@@ -307,9 +315,7 @@ export default function InsightsPage() {
             <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />
 
             <div>
-              <p className="font-semibold">
-                Organization-secured insights
-              </p>
+              <p className="font-semibold">Organization-secured insights</p>
 
               <p className="mt-1">
                 Current Org ID:{" "}
@@ -323,7 +329,10 @@ export default function InsightsPage() {
 
         {loading ? (
           <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center text-slate-500 shadow-sm">
-            Loading AI insights...
+            <div className="flex items-center justify-center gap-2">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              Loading AI insights...
+            </div>
           </div>
         ) : (
           <>
@@ -394,9 +403,7 @@ export default function InsightsPage() {
                                   insight.priority
                                 )}`}
                               >
-                                {getInsightIcon(
-                                  insight.category
-                                )}
+                                {getInsightIcon(insight.category)}
                               </div>
 
                               <div>
@@ -424,8 +431,17 @@ export default function InsightsPage() {
                               </div>
                             </div>
 
-                            <button className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100">
-                              Review
+                            <button
+                              type="button"
+                              onClick={() =>
+                                router.push(
+                                  insight.reviewUrl ||
+                                    getFallbackReviewUrl(insight.category)
+                                )
+                              }
+                              className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+                            >
+                              {insight.buttonLabel || "Review"}
                               <ArrowRight className="h-4 w-4" />
                             </button>
                           </div>
@@ -486,9 +502,7 @@ export default function InsightsPage() {
                           : "Stable"
                       }
                       tone={
-                        (stats?.openMaintenance ?? 0) > 0
-                          ? "warn"
-                          : "good"
+                        (stats?.openMaintenance ?? 0) > 0 ? "warn" : "good"
                       }
                     />
 
@@ -500,9 +514,7 @@ export default function InsightsPage() {
                           : "Good"
                       }
                       tone={
-                        (stats?.missingDocuments ?? 0) > 0
-                          ? "warn"
-                          : "good"
+                        (stats?.missingDocuments ?? 0) > 0 ? "warn" : "good"
                       }
                     />
 
@@ -513,11 +525,7 @@ export default function InsightsPage() {
                           ? "Review Suggested"
                           : "Stable"
                       }
-                      tone={
-                        (stats?.paymentRisk ?? 0) > 0
-                          ? "warn"
-                          : "good"
-                      }
+                      tone={(stats?.paymentRisk ?? 0) > 0 ? "warn" : "good"}
                     />
                   </div>
                 </div>
@@ -528,24 +536,17 @@ export default function InsightsPage() {
                   </h3>
 
                   <div className="mt-6 space-y-4">
-                    <StatusRow
-                      label="Rule Engine"
-                      value="Active"
-                      color="green"
-                    />
-
+                    <StatusRow label="Rule Engine" value="Active" color="green" />
                     <StatusRow
                       label="Portfolio Scan"
                       value="Available"
                       color="blue"
                     />
-
                     <StatusRow
                       label="Predictive Models"
                       value="Coming Soon"
                       color="amber"
                     />
-
                     <StatusRow
                       label="Auto Suggestions"
                       value="Enabled"
@@ -566,46 +567,34 @@ function getInsightIcon(category: string) {
   switch (category) {
     case "FINANCIAL":
       return <Wallet className="h-5 w-5" />;
-
     case "MAINTENANCE":
       return <Hammer className="h-5 w-5" />;
-
     case "DOCUMENTS":
       return <FileWarning className="h-5 w-5" />;
-
     case "OCCUPANCY":
       return <TrendingUp className="h-5 w-5" />;
-
     default:
       return <ShieldCheck className="h-5 w-5" />;
   }
 }
 
-function getPriorityBadge(
-  priority: "HIGH" | "MEDIUM" | "LOW"
-) {
+function getPriorityBadge(priority: "HIGH" | "MEDIUM" | "LOW") {
   switch (priority) {
     case "HIGH":
       return "bg-red-100 text-red-700";
-
     case "MEDIUM":
       return "bg-amber-100 text-amber-700";
-
     default:
       return "bg-emerald-100 text-emerald-700";
   }
 }
 
-function getPriorityIconBox(
-  priority: "HIGH" | "MEDIUM" | "LOW"
-) {
+function getPriorityIconBox(priority: "HIGH" | "MEDIUM" | "LOW") {
   switch (priority) {
     case "HIGH":
       return "bg-red-100 text-red-600";
-
     case "MEDIUM":
       return "bg-amber-100 text-amber-600";
-
     default:
       return "bg-emerald-100 text-emerald-600";
   }
@@ -641,13 +630,9 @@ function StatCard({
 
       <p className="text-lg text-slate-500">{title}</p>
 
-      <h3 className="mt-4 text-4xl font-bold text-slate-900">
-        {value}
-      </h3>
+      <h3 className="mt-4 text-4xl font-bold text-slate-900">{value}</h3>
 
-      <p className="mt-4 text-lg text-slate-400">
-        {subtitle}
-      </p>
+      <p className="mt-4 text-lg text-slate-400">{subtitle}</p>
     </div>
   );
 }
@@ -688,10 +673,7 @@ function StatusRow({
   value: string;
   color: "green" | "blue" | "amber";
 }) {
-  const colorClasses: Record<
-    "green" | "blue" | "amber",
-    string
-  > = {
+  const colorClasses: Record<"green" | "blue" | "amber", string> = {
     green: "bg-emerald-100 text-emerald-700",
     blue: "bg-blue-100 text-blue-700",
     amber: "bg-amber-100 text-amber-700",

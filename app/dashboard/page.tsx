@@ -466,7 +466,6 @@ return;
 
           <div className="mt-6 space-y-5">
             <SummaryRow label="Properties created" value={String(stats.totalProperties)} />
-            <SummaryRow label="Units available in system" value={String(stats.totalUnits)} />
             <SummaryRow label="Tenant records" value={String(stats.totalTenants)} />
             <SummaryRow label="Occupancy" value={`${stats.occupancyRate}%`} />
             <SummaryRow label="Open maintenance requests" value={String(stats.openMaintenance)} />
