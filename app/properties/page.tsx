@@ -29,8 +29,10 @@ type Property = {
   code: string;
   name: string | null;
   addressLine1: string;
+  addressLine2?: string | null;
   city: string | null;
   state: string | null;
+  postalCode?: string | null;
   country: string | null;
   propertyType: string;
   monthlyRent?: number | null;
@@ -51,8 +53,12 @@ type Property = {
 
 type PropertyFormData = {
   name: string;
-  address: string;
+  addressLine1: string;
+  addressLine2: string;
   city: string;
+  state: string;
+  postalCode: string;
+  country: string;
   propertyType: string;
   monthlyRent: string;
   description: string;
@@ -64,7 +70,6 @@ type PropertyFormData = {
   parkingSpaces: string;
   availableFrom: string;
   ownerName: string;
-  occupancyStatus: string;
 };
 
 type SortField =
@@ -72,9 +77,10 @@ type SortField =
   | "name"
   | "addressLine1"
   | "city"
+  | "state"
+  | "country"
   | "propertyType"
-  | "monthlyRent"
-  | "unitsCount";
+  | "monthlyRent";
 
 type StoredUser = {
   id?: string;
@@ -101,17 +107,14 @@ const FURNISHING_OPTIONS = [
   { label: "Unfurnished", value: "UNFURNISHED" },
 ];
 
-const OCCUPANCY_OPTIONS = [
-  { label: "Available", value: "AVAILABLE" },
-  { label: "Occupied", value: "OCCUPIED" },
-  { label: "Maintenance", value: "MAINTENANCE" },
-  { label: "Reserved", value: "RESERVED" },
-];
-
 const createInitialFormData = (): PropertyFormData => ({
   name: "",
-  address: "",
+  addressLine1: "",
+  addressLine2: "",
   city: "",
+  state: "",
+  postalCode: "",
+  country: "",
   propertyType: "APARTMENT",
   monthlyRent: "",
   description: "",
@@ -123,7 +126,6 @@ const createInitialFormData = (): PropertyFormData => ({
   parkingSpaces: "0",
   availableFrom: "",
   ownerName: "",
-  occupancyStatus: "AVAILABLE",
 });
 
 function getPropertyTypePrefix(propertyType: string) {
@@ -308,8 +310,12 @@ export default function PropertiesPage() {
     setEditingPropertyId(property.id);
     setFormData({
       name: property.name ?? "",
-      address: property.addressLine1 ?? "",
+      addressLine1: property.addressLine1 ?? "",
+      addressLine2: property.addressLine2 ?? "",
       city: property.city ?? "",
+      state: property.state ?? "",
+      postalCode: property.postalCode ?? "",
+      country: property.country ?? "",
       propertyType: property.propertyType ?? "APARTMENT",
       monthlyRent:
         property.monthlyRent !== null && property.monthlyRent !== undefined
@@ -341,7 +347,6 @@ export default function PropertiesPage() {
         ? String(property.availableFrom).slice(0, 10)
         : "",
       ownerName: property.ownerName ?? "",
-      occupancyStatus: property.occupancyStatus ?? "AVAILABLE",
     });
 
     setShowAddModal(true);
@@ -377,39 +382,57 @@ export default function PropertiesPage() {
       const payload = {
         code: isEditing ? currentProperty?.code || generatedCode : generatedCode,
         name: formData.name.trim() || null,
-        addressLine1: formData.address.trim(),
+
+        addressLine1: formData.addressLine1.trim(),
+        addressLine2: formData.addressLine2.trim() || null,
+
         city: formData.city.trim() || null,
-        state: null,
-        country: null,
+        state: formData.state.trim() || null,
+        postalCode: formData.postalCode.trim() || null,
+        country: formData.country.trim() || null,
+
         propertyType: formData.propertyType || "APARTMENT",
+
         unitsCount: 1,
+
         monthlyRent:
           formData.monthlyRent.trim() !== ""
             ? parseFloat(formData.monthlyRent)
             : null,
+
         description: formData.description.trim() || null,
+
         bedrooms:
           formData.bedrooms.trim() !== ""
             ? parseInt(formData.bedrooms, 10)
             : null,
+
         bathrooms:
           formData.bathrooms.trim() !== ""
             ? parseInt(formData.bathrooms, 10)
             : null,
+
         areaSqm:
           formData.areaSqm.trim() !== ""
             ? parseFloat(formData.areaSqm)
             : null,
+
         floor:
           formData.floor.trim() !== "" ? parseInt(formData.floor, 10) : null,
+
         furnishingStatus: formData.furnishingStatus || null,
+
         parkingSpaces:
           formData.parkingSpaces.trim() !== ""
             ? parseInt(formData.parkingSpaces, 10)
             : 0,
+
         availableFrom: formData.availableFrom || null,
+
         ownerName: formData.ownerName.trim() || null,
-        occupancyStatus: formData.occupancyStatus || "AVAILABLE",
+
+        occupancyStatus: "AVAILABLE",
+
         isActive: true,
       };
 
@@ -468,13 +491,6 @@ export default function PropertiesPage() {
 
       const data = await res.json().catch(() => null);
 
-      if (res.status === 401) {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-        router.replace("/");
-        return;
-      }
-
       if (!res.ok) {
         throw new Error(data?.error || "Delete failed");
       }
@@ -486,8 +502,7 @@ export default function PropertiesPage() {
       alert(err.message || "Failed to delete property.");
     }
   };
-
-  const uniqueCities = useMemo(() => {
+    const uniqueCities = useMemo(() => {
     const cities = properties
       .map((p) => p.city?.trim())
       .filter((city): city is string => Boolean(city));
@@ -519,6 +534,9 @@ export default function PropertiesPage() {
         property.name?.toLowerCase().includes(q) ||
         property.addressLine1?.toLowerCase().includes(q) ||
         property.city?.toLowerCase().includes(q) ||
+        property.state?.toLowerCase().includes(q) ||
+        property.country?.toLowerCase().includes(q) ||
+        property.postalCode?.toLowerCase().includes(q) ||
         property.propertyType?.toLowerCase().includes(q);
 
       const matchesCity = cityFilter === "All" || property.city === cityFilter;
@@ -533,7 +551,7 @@ export default function PropertiesPage() {
       const aValue = a[sortField];
       const bValue = b[sortField];
 
-      if (sortField === "monthlyRent" || sortField === "unitsCount") {
+      if (sortField === "monthlyRent") {
         const aNum = Number(aValue ?? 0);
         const bNum = Number(bValue ?? 0);
         return (aNum - bNum) * direction;
@@ -669,7 +687,7 @@ export default function PropertiesPage() {
             />
             <input
               type="text"
-              placeholder="Search property, code, address, city..."
+              placeholder="Search property, code, address, city, state, country..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full rounded-xl border border-slate-300 py-3 pl-10 pr-4 outline-none focus:border-blue-500"
@@ -716,7 +734,7 @@ export default function PropertiesPage() {
         ) : (
           <>
             <div className="overflow-x-auto">
-              <table className="min-w-[1100px] border-separate border-spacing-y-3">
+              <table className="min-w-[1200px] border-separate border-spacing-y-3">
                 <thead>
                   <tr className="text-left text-sm text-slate-500">
                     <th className="px-4 py-2">
@@ -756,6 +774,28 @@ export default function PropertiesPage() {
                     <th className="px-4 py-2">
                       <button
                         type="button"
+                        onClick={() => handleSort("state")}
+                        className="font-medium hover:text-slate-900"
+                      >
+                        State {renderSortIcon("state")}
+                      </button>
+                    </th>
+
+                    <th className="px-4 py-2">
+                      <button
+                        type="button"
+                        onClick={() => handleSort("country")}
+                        className="font-medium hover:text-slate-900"
+                      >
+                        Country {renderSortIcon("country")}
+                      </button>
+                    </th>
+
+                    <th className="px-4 py-2">ZIP</th>
+
+                    <th className="px-4 py-2">
+                      <button
+                        type="button"
                         onClick={() => handleSort("propertyType")}
                         className="font-medium hover:text-slate-900"
                       >
@@ -769,17 +809,7 @@ export default function PropertiesPage() {
                         onClick={() => handleSort("monthlyRent")}
                         className="font-medium hover:text-slate-900"
                       >
-                        Price {renderSortIcon("monthlyRent")}
-                      </button>
-                    </th>
-
-                    <th className="px-4 py-2">
-                      <button
-                        type="button"
-                        onClick={() => handleSort("unitsCount")}
-                        className="font-medium hover:text-slate-900"
-                      >
-                        Units {renderSortIcon("unitsCount")}
+                        Rent {renderSortIcon("monthlyRent")}
                       </button>
                     </th>
 
@@ -816,6 +846,18 @@ export default function PropertiesPage() {
                       </td>
 
                       <td className="px-4 py-4 text-slate-600">
+                        {property.state || "-"}
+                      </td>
+
+                      <td className="px-4 py-4 text-slate-600">
+                        {property.country || "-"}
+                      </td>
+
+                      <td className="px-4 py-4 text-slate-600">
+                        {property.postalCode || "-"}
+                      </td>
+
+                      <td className="px-4 py-4 text-slate-600">
                         {property.propertyType}
                       </td>
 
@@ -823,10 +865,6 @@ export default function PropertiesPage() {
                         {property.monthlyRent != null
                           ? `$${Number(property.monthlyRent).toLocaleString()}`
                           : "-"}
-                      </td>
-
-                      <td className="px-4 py-4 text-slate-600">
-                        {property.unitsCount}
                       </td>
 
                       <td className="px-4 py-4">
@@ -941,7 +979,7 @@ export default function PropertiesPage() {
                     {editingPropertyId ? "Edit Property" : "Add New Property"}
                   </h3>
                   <p className="mt-1 text-sm text-slate-500">
-                    Fill in the property information below.
+                    Create the property only. Tenant will be associated later.
                   </p>
                 </div>
 
@@ -981,12 +1019,26 @@ export default function PropertiesPage() {
                     </label>
                     <input
                       type="text"
-                      name="address"
-                      value={formData.address}
+                      name="addressLine1"
+                      value={formData.addressLine1}
                       onChange={handleChange}
                       placeholder="45 Avenue Example"
                       className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
                       required
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      Address 2
+                    </label>
+                    <input
+                      type="text"
+                      name="addressLine2"
+                      value={formData.addressLine2}
+                      onChange={handleChange}
+                      placeholder="Apartment, suite, building, floor..."
+                      className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
                     />
                   </div>
 
@@ -999,9 +1051,51 @@ export default function PropertiesPage() {
                       name="city"
                       value={formData.city}
                       onChange={handleChange}
-                      placeholder="Goma"
+                      placeholder="Dallas"
                       className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
                       required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      State
+                    </label>
+                    <input
+                      type="text"
+                      name="state"
+                      value={formData.state}
+                      onChange={handleChange}
+                      placeholder="Puerto Rico / TX / CA"
+                      className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      ZIP Code
+                    </label>
+                    <input
+                      type="text"
+                      name="postalCode"
+                      value={formData.postalCode}
+                      onChange={handleChange}
+                      placeholder="75001"
+                      className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      Country
+                    </label>
+                    <input
+                      type="text"
+                      name="country"
+                      value={formData.country}
+                      onChange={handleChange}
+                      placeholder="USA "
+                      className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
                     />
                   </div>
 
@@ -1040,7 +1134,7 @@ export default function PropertiesPage() {
 
                   <div>
                     <label className="mb-1 block text-sm font-medium text-slate-700">
-                      Apartment Price / Monthly Rent
+                      Monthly Rent
                     </label>
                     <input
                       type="number"
@@ -1050,6 +1144,20 @@ export default function PropertiesPage() {
                       placeholder="1200"
                       min="0"
                       step="0.01"
+                      className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      Owner / Landlord
+                    </label>
+                    <input
+                      type="text"
+                      name="ownerName"
+                      value={formData.ownerName}
+                      onChange={handleChange}
+                      placeholder="John Smith"
                       className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
                     />
                   </div>
@@ -1167,38 +1275,6 @@ export default function PropertiesPage() {
                       onChange={handleChange}
                       className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
                     />
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      Owner / Landlord
-                    </label>
-                    <input
-                      type="text"
-                      name="ownerName"
-                      value={formData.ownerName}
-                      onChange={handleChange}
-                      placeholder="John Smith"
-                      className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      Status
-                    </label>
-                    <select
-                      name="occupancyStatus"
-                      value={formData.occupancyStatus}
-                      onChange={handleChange}
-                      className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
-                    >
-                      {OCCUPANCY_OPTIONS.map((item) => (
-                        <option key={item.value} value={item.value}>
-                          {item.label}
-                        </option>
-                      ))}
-                    </select>
                   </div>
                 </form>
               </div>

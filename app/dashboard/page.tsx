@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ShieldCheck } from "lucide-react";
+import { ShieldCheck, Lock, Loader2 } from "lucide-react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -30,29 +30,14 @@ type StoredUser = {
   email?: string;
   role?: string;
   organizationId?: string;
+  mustChangePassword?: boolean;
 };
 
 const quickActions = [
-  {
-    title: "Add Property",
-    description: "Create a new property record",
-    href: "/properties",
-  },
-  {
-    title: "Add Tenant",
-    description: "Register a new tenant",
-    href: "/tenants/add",
-  },
-  {
-    title: "Create Maintenance",
-    description: "Open a maintenance request",
-    href: "/maintenance/new",
-  },
-  {
-    title: "View Reports",
-    description: "Open reports and analytics",
-    href: "/insights",
-  },
+  { title: "Add Property", description: "Create a new property record", href: "/properties" },
+  { title: "Add Tenant", description: "Register a new tenant", href: "/tenants/add" },
+  { title: "Create Maintenance", description: "Open a maintenance request", href: "/maintenance/new" },
+  { title: "View Reports", description: "Open reports and analytics", href: "/insights" },
 ];
 
 const recentActivity = [
@@ -72,6 +57,14 @@ export default function DashboardPage() {
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [user, setUser] = useState<StoredUser | null>(null);
 
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordSuccess, setPasswordSuccess] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
+
   useEffect(() => {
     const token = localStorage.getItem("token");
     const userRaw = localStorage.getItem("user");
@@ -90,8 +83,39 @@ export default function DashboardPage() {
         return;
       }
 
-      setUser(parsedUser);
-      setCheckingAuth(false);
+      async function verifyUserFromBackend() {
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/me`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      cache: "no-store",
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      router.replace("/");
+      return;
+    }
+
+    const freshUser = data.user;
+
+    localStorage.setItem("user", JSON.stringify(freshUser));
+
+    setUser(freshUser);
+    setShowPasswordModal(freshUser?.mustChangePassword === true);
+    setCheckingAuth(false);
+  } catch (err) {
+    console.error("Auth verify error:", err);
+    router.replace("/");
+  }
+}
+
+verifyUserFromBackend();
+return;
     } catch (err) {
       console.error("Auth parse error:", err);
       localStorage.removeItem("token");
@@ -137,6 +161,76 @@ export default function DashboardPage() {
 
     loadDashboard();
   }, [checkingAuth, router]);
+
+  async function handleChangePassword(e: React.FormEvent) {
+    e.preventDefault();
+
+    setPasswordError("");
+    setPasswordSuccess("");
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPasswordError("All fields are required.");
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      setPasswordError("New password must be at least 8 characters.");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError("New password and confirmation do not match.");
+      return;
+    }
+
+    try {
+      setChangingPassword(true);
+
+      const token = localStorage.getItem("token");
+
+      const res = await fetch(`${API_BASE}/api/auth/change-password`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token || ""}`,
+        },
+        body: JSON.stringify({
+          currentPassword,
+          newPassword,
+          confirmPassword,
+        }),
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(data?.error || "Failed to change password.");
+      }
+
+      const oldUser = JSON.parse(localStorage.getItem("user") || "{}");
+      const updatedUser = {
+        ...oldUser,
+        mustChangePassword: false,
+      };
+
+      localStorage.setItem("user", JSON.stringify(updatedUser));
+      setUser(updatedUser);
+
+      setPasswordSuccess("Password changed successfully.");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+
+      setTimeout(() => {
+        setShowPasswordModal(false);
+        setPasswordSuccess("");
+      }, 900);
+    } catch (err: any) {
+      setPasswordError(err?.message || "Failed to change password.");
+    } finally {
+      setChangingPassword(false);
+    }
+  }
 
   const chartData = useMemo(() => {
     return [
@@ -199,6 +293,90 @@ export default function DashboardPage() {
         ) : null
       }
     >
+      {showPasswordModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-[28px] border border-slate-200 bg-white p-7 shadow-2xl">
+            <div className="mb-6 flex items-start gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-blue-700">
+                <Lock className="h-6 w-6" />
+              </div>
+
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900">
+                  Change your password
+                </h2>
+                <p className="mt-1 text-sm leading-6 text-slate-500">
+                  For security, you must change your temporary password before
+                  continuing.
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                  Current temporary password
+                </label>
+                <input
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                  placeholder="Enter current password"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                  New password
+                </label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                  placeholder="Minimum 8 characters"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                  Confirm new password
+                </label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                  placeholder="Confirm new password"
+                />
+              </div>
+
+              {passwordError && (
+                <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+                  {passwordError}
+                </div>
+              )}
+
+              {passwordSuccess && (
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+                  {passwordSuccess}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={changingPassword}
+                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-lg transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {changingPassword && <Loader2 className="h-4 w-4 animate-spin" />}
+                Save new password
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
       {isSuperAdmin && (
         <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-700">
           <div className="flex items-start gap-3">
@@ -215,47 +393,17 @@ export default function DashboardPage() {
       )}
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <StatCard
-          title="Total Properties"
-          value={stats.totalProperties}
-          subtitle="Registered assets"
-          accent="blue"
-        />
-        <StatCard
-          title="Total Units"
-          value={stats.totalUnits}
-          subtitle="Units in portfolio"
-          accent="indigo"
-        />
-        <StatCard
-          title="Total Tenants"
-          value={stats.totalTenants}
-          subtitle="Tenant records"
-          accent="cyan"
-        />
-        <StatCard
-          title="Occupancy Rate"
-          value={`${stats.occupancyRate}%`}
-          subtitle="Occupied unit ratio"
-          accent="emerald"
-        />
-        <StatCard
-          title="Open Maintenance"
-          value={stats.openMaintenance ?? 0}
-          subtitle="Pending issues"
-          accent="amber"
-        />
+        <StatCard title="Total Properties" value={stats.totalProperties} subtitle="Registered assets" accent="blue" />
+        <StatCard title="Total Tenants" value={stats.totalTenants} subtitle="Tenant records" accent="cyan" />
+        <StatCard title="Occupancy Rate" value={`${stats.occupancyRate}%`} subtitle="Occupied unit ratio" accent="emerald" />
+        <StatCard title="Open Maintenance" value={stats.openMaintenance ?? 0} subtitle="Pending issues" accent="amber" />
       </section>
 
       <section className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 xl:col-span-2">
           <div className="mb-6">
-            <h3 className="text-xl font-semibold text-slate-900">
-              Quick Actions
-            </h3>
-            <p className="text-sm text-slate-500">
-              Fast access to common tasks
-            </p>
+            <h3 className="text-xl font-semibold text-slate-900">Quick Actions</h3>
+            <p className="text-sm text-slate-500">Fast access to common tasks</p>
           </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -266,27 +414,14 @@ export default function DashboardPage() {
                   href={action.href}
                   className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-blue-50 p-5 text-left transition hover:border-blue-300 hover:shadow-md"
                 >
-                  <h4 className="text-base font-semibold text-slate-900">
-                    {action.title}
-                  </h4>
-                  <p className="mt-2 text-sm text-slate-500">
-                    {action.description}
-                  </p>
+                  <h4 className="text-base font-semibold text-slate-900">{action.title}</h4>
+                  <p className="mt-2 text-sm text-slate-500">{action.description}</p>
                 </Link>
               ) : (
-                <div
-                  key={action.title}
-                  className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-left opacity-80"
-                >
-                  <h4 className="text-base font-semibold text-slate-900">
-                    {action.title}
-                  </h4>
-                  <p className="mt-2 text-sm text-slate-500">
-                    {action.description}
-                  </p>
-                  <p className="mt-3 text-xs font-medium text-amber-600">
-                    Read only
-                  </p>
+                <div key={action.title} className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-left opacity-80">
+                  <h4 className="text-base font-semibold text-slate-900">{action.title}</h4>
+                  <p className="mt-2 text-sm text-slate-500">{action.description}</p>
+                  <p className="mt-3 text-xs font-medium text-amber-600">Read only</p>
                 </div>
               )
             )}
@@ -294,12 +429,8 @@ export default function DashboardPage() {
         </div>
 
         <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-          <h3 className="text-xl font-semibold text-slate-900">
-            System Status
-          </h3>
-          <p className="mt-1 text-sm text-slate-500">
-            Backend and application health
-          </p>
+          <h3 className="text-xl font-semibold text-slate-900">System Status</h3>
+          <p className="mt-1 text-sm text-slate-500">Backend and application health</p>
 
           <div className="mt-6 space-y-4">
             <StatusRow label="API Server" status="Online" color="green" />
@@ -307,11 +438,7 @@ export default function DashboardPage() {
             <StatusRow label="Dashboard Route" status="Active" color="green" />
             <StatusRow
               label="Open Issues"
-              status={
-                stats.openMaintenance > 0
-                  ? String(stats.openMaintenance)
-                  : "None"
-              }
+              status={stats.openMaintenance > 0 ? String(stats.openMaintenance) : "None"}
               color={stats.openMaintenance > 0 ? "yellow" : "green"}
             />
           </div>
@@ -320,19 +447,12 @@ export default function DashboardPage() {
 
       <section className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-2">
         <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-          <h3 className="text-xl font-semibold text-slate-900">
-            Recent Activity
-          </h3>
-          <p className="mt-1 text-sm text-slate-500">
-            Latest operations and technical events
-          </p>
+          <h3 className="text-xl font-semibold text-slate-900">Recent Activity</h3>
+          <p className="mt-1 text-sm text-slate-500">Latest operations and technical events</p>
 
           <div className="mt-6 space-y-4">
             {recentActivity.map((item, index) => (
-              <div
-                key={index}
-                className="flex items-start gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4"
-              >
+              <div key={index} className="flex items-start gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4">
                 <div className="mt-1 h-2.5 w-2.5 rounded-full bg-blue-600" />
                 <p className="text-sm text-slate-700">{item}</p>
               </div>
@@ -341,43 +461,23 @@ export default function DashboardPage() {
         </div>
 
         <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-          <h3 className="text-xl font-semibold text-slate-900">
-            Portfolio Summary
-          </h3>
-          <p className="mt-1 text-sm text-slate-500">
-            Current status of your portfolio
-          </p>
+          <h3 className="text-xl font-semibold text-slate-900">Portfolio Summary</h3>
+          <p className="mt-1 text-sm text-slate-500">Current status of your portfolio</p>
 
           <div className="mt-6 space-y-5">
-            <SummaryRow
-              label="Properties created"
-              value={String(stats.totalProperties)}
-            />
-            <SummaryRow
-              label="Units available in system"
-              value={String(stats.totalUnits)}
-            />
-            <SummaryRow
-              label="Tenant records"
-              value={String(stats.totalTenants)}
-            />
+            <SummaryRow label="Properties created" value={String(stats.totalProperties)} />
+            <SummaryRow label="Units available in system" value={String(stats.totalUnits)} />
+            <SummaryRow label="Tenant records" value={String(stats.totalTenants)} />
             <SummaryRow label="Occupancy" value={`${stats.occupancyRate}%`} />
-            <SummaryRow
-              label="Open maintenance requests"
-              value={String(stats.openMaintenance)}
-            />
+            <SummaryRow label="Open maintenance requests" value={String(stats.openMaintenance)} />
           </div>
         </div>
       </section>
 
       <section className="mt-8 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
         <div className="mb-4">
-          <h3 className="text-xl font-semibold text-slate-900">
-            Portfolio Overview
-          </h3>
-          <p className="text-sm text-slate-500">
-            Visual summary of current portfolio data
-          </p>
+          <h3 className="text-xl font-semibold text-slate-900">Portfolio Overview</h3>
+          <p className="text-sm text-slate-500">Visual summary of current portfolio data</p>
         </div>
 
         <div className="h-64 overflow-x-auto sm:h-72">
@@ -419,13 +519,9 @@ function StatCard({
 
   return (
     <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-      <div
-        className={`mb-4 h-2 w-16 rounded-full bg-gradient-to-r ${accentMap[accent]}`}
-      />
+      <div className={`mb-4 h-2 w-16 rounded-full bg-gradient-to-r ${accentMap[accent]}`} />
       <p className="text-sm font-medium text-slate-500">{title}</p>
-      <p className="mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
-        {value}
-      </p>
+      <p className="mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">{value}</p>
       <p className="mt-3 text-sm text-slate-500">{subtitle}</p>
     </div>
   );

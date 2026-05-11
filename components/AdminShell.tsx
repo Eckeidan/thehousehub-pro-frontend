@@ -32,7 +32,6 @@ type AdminShellProps = {
   activeItem:
     | "dashboard"
     | "properties"
-    | "units"
     | "tenants"
     | "vendors"
     | "maintenance"
@@ -60,12 +59,6 @@ const menuItems = [
     label: "Properties",
     href: "/properties",
     icon: <Building2 size={18} />,
-  },
-  {
-    key: "units",
-    label: "Units",
-    href: "/units",
-    icon: <Home size={18} />,
   },
   {
     key: "tenants",

@@ -108,9 +108,8 @@ export default function LoginPage() {
 
             <div className="space-y-4">
               {[
-                ["Owners / Admins", "Access the full dashboard, portfolio stats, tenants, units, maintenance, reports, documents, and settings."],
+                ["Landload / Admins", "Access the full dashboard, portfolio stats, tenants, units, maintenance, reports, documents, and settings."],
                 ["Tenants", "Access your tenant space, lease information, payments, and maintenance requests."],
-                ["The House Hub", "Built for a premium property management experience."],
               ].map(([title, text]) => (
                 <div
                   key={title}
@@ -210,13 +209,7 @@ export default function LoginPage() {
                 </button>
               </form>
 
-              <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-500 sm:mt-8">
-                <p className="font-medium text-slate-700">Role-based access</p>
-                <p className="mt-1">
-                  Admin goes to dashboard, owner goes to owner space, tenant
-                  goes to tenant portal.
-                </p>
-              </div>
+              
             </div>
           </section>
         </div>

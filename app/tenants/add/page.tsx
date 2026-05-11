@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Loader2, Save, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
@@ -19,38 +20,31 @@ interface Property {
   id: string;
   name?: string | null;
   code?: string | null;
-}
-
-interface Unit {
-  id: string;
-  propertyId: string;
-  unitCode: string;
-  unitName?: string | null;
-  occupancyStatus?: string | null;
-  isActive: boolean;
+  addressLine1?: string | null;
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
   monthlyRent?: string | number | null;
-  floor?: number | null;
-  bedrooms?: number | null;
-  bathrooms?: number | null;
+  occupancyStatus?: string | null;
+  isOccupied?: boolean;
+  activeTenant?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+  } | null;
 }
 
 export default function AddTenantPage() {
   const router = useRouter();
 
   const [checkingAuth, setCheckingAuth] = useState(true);
-  const [user, setUser] = useState<StoredUser | null>(null);
-
   const [properties, setProperties] = useState<Property[]>([]);
-  const [units, setUnits] = useState<Unit[]>([]);
   const [loadingProperties, setLoadingProperties] = useState(true);
-  const [loadingUnits, setLoadingUnits] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
 
   const [formData, setFormData] = useState({
     propertyId: "",
-    unitId: "",
     firstName: "",
     lastName: "",
     email: "",
@@ -81,7 +75,6 @@ export default function AddTenantPage() {
         return;
       }
 
-      setUser(parsedUser);
       setCheckingAuth(false);
     } catch (error) {
       console.error("Auth error:", error);
@@ -96,20 +89,6 @@ export default function AddTenantPage() {
       fetchProperties();
     }
   }, [checkingAuth]);
-
-  useEffect(() => {
-    if (checkingAuth) return;
-
-    if (formData.propertyId) {
-      fetchUnitsByProperty(formData.propertyId);
-    } else {
-      setUnits([]);
-      setFormData((prev) => ({
-        ...prev,
-        unitId: "",
-      }));
-    }
-  }, [checkingAuth, formData.propertyId]);
 
   async function fetchProperties() {
     try {
@@ -132,122 +111,44 @@ export default function AddTenantPage() {
         return;
       }
 
-      const contentType = res.headers.get("content-type") || "";
+      const data = await res.json().catch(() => null);
 
       if (!res.ok) {
-        if (contentType.includes("application/json")) {
-          const errData = await res.json();
-          throw new Error(errData?.error || "Failed to load properties");
-        } else {
-          const errText = await res.text();
-          throw new Error(errText || "Failed to load properties");
-        }
+        throw new Error(data?.error || "Failed to load properties");
       }
 
-      if (!contentType.includes("application/json")) {
-        throw new Error("Invalid response from properties API.");
-      }
-
-      const data = await res.json();
       setProperties(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Error loading properties:", err);
-      setError(
-        err instanceof Error ? err.message : "Unable to load properties."
-      );
+      setError(err instanceof Error ? err.message : "Unable to load properties.");
+      toast.error(err instanceof Error ? err.message : "Unable to load properties.");
     } finally {
       setLoadingProperties(false);
     }
   }
 
-  async function fetchUnitsByProperty(propertyId: string) {
-    try {
-      setLoadingUnits(true);
-      setError("");
-
-      const token = localStorage.getItem("token");
-
-      const res = await fetch(
-        `${API_URL}/api/units?propertyId=${encodeURIComponent(propertyId)}`,
-        {
-          cache: "no-store",
-          headers: {
-            Authorization: `Bearer ${token || ""}`,
-          },
-        }
-      );
-
-      if (res.status === 401) {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-        router.replace("/");
-        return;
-      }
-
-      const contentType = res.headers.get("content-type") || "";
-
-      if (!res.ok) {
-        if (contentType.includes("application/json")) {
-          const errData = await res.json();
-          throw new Error(errData?.error || "Failed to load units");
-        } else {
-          const errText = await res.text();
-          throw new Error(errText || "Failed to load units");
-        }
-      }
-
-      if (!contentType.includes("application/json")) {
-        throw new Error("Invalid response from units API.");
-      }
-
-      const data = await res.json();
-      const allUnits = Array.isArray(data) ? data : [];
-      setUnits(allUnits);
-
-      setFormData((prev) => ({
-        ...prev,
-        unitId: "",
-      }));
-    } catch (err) {
-      console.error("Error loading units:", err);
-      setError(err instanceof Error ? err.message : "Unable to load units.");
-      setUnits([]);
-    } finally {
-      setLoadingUnits(false);
-    }
-  }
-
   function handleChange(
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-    >
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) {
     const { name, value } = e.target;
 
     setFormData((prev) => ({
       ...prev,
       [name]: value,
-      ...(name === "propertyId" ? { unitId: "" } : {}),
     }));
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    setSuccess("");
 
     if (!formData.firstName.trim() || !formData.lastName.trim()) {
-      setError("First name and last name are required.");
+      toast.error("First name and last name are required.");
       return;
     }
 
     if (!formData.propertyId) {
-      setError("Please select a property.");
-      return;
-    }
-
-    if (!formData.unitId) {
-      setError("Please select a unit.");
+      toast.error("Please select a property.");
       return;
     }
 
@@ -264,7 +165,7 @@ export default function AddTenantPage() {
         },
         body: JSON.stringify({
           propertyId: formData.propertyId,
-          unitId: formData.unitId,
+          unitId: null,
           firstName: formData.firstName.trim(),
           lastName: formData.lastName.trim(),
           email: formData.email.trim() || null,
@@ -285,36 +186,16 @@ export default function AddTenantPage() {
         return;
       }
 
-      const contentType = res.headers.get("content-type") || "";
-      let data: any = null;
-
-      if (contentType.includes("application/json")) {
-        data = await res.json();
-      } else {
-        const text = await res.text();
-        throw new Error(
-          text || "Server did not return valid JSON. Check backend /api/tenants."
-        );
-      }
+      const data = await res.json().catch(() => null);
 
       if (!res.ok) {
-        const rawMessage =
-          data?.error || data?.message || "Failed to create tenant";
-
-        if (rawMessage === "This unit already has an active lease") {
-          throw new Error(
-            "This unit is already occupied by an active lease. Please choose another available unit."
-          );
-        }
-
-        throw new Error(rawMessage);
+        throw new Error(data?.error || data?.message || "Failed to create tenant");
       }
 
-      setSuccess("Tenant created successfully.");
+      toast.success("Tenant created successfully");
 
       setFormData({
         propertyId: "",
-        unitId: "",
         firstName: "",
         lastName: "",
         email: "",
@@ -327,30 +208,18 @@ export default function AddTenantPage() {
         notes: "",
       });
 
-      setUnits([]);
       await fetchProperties();
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to create tenant.";
-
-      console.warn("Tenant form warning:", message);
+      const message = err instanceof Error ? err.message : "Failed to create tenant.";
       setError(message);
+      toast.error(message);
     } finally {
       setSaving(false);
     }
   }
 
-  const availableUnits = useMemo(() => {
-    return units.filter(
-      (unit) =>
-        unit.isActive &&
-        (unit.occupancyStatus === "AVAILABLE" || !unit.occupancyStatus)
-    );
-  }, [units]);
-
-  const selectedUnit = useMemo(() => {
-    return units.find((unit) => unit.id === formData.unitId) || null;
-  }, [units, formData.unitId]);
+  const selectedProperty =
+    properties.find((property) => property.id === formData.propertyId) || null;
 
   if (checkingAuth) {
     return (
@@ -379,10 +248,9 @@ export default function AddTenantPage() {
               Add Tenant
             </h1>
             <p className="mt-1 text-sm text-slate-500">
-              Create a new tenant record and assign an available unit.
+              Create a tenant and associate them directly with an existing property.
             </p>
           </div>
-          
         </div>
       </div>
 
@@ -393,74 +261,17 @@ export default function AddTenantPage() {
         </div>
       )}
 
-      {success && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-          {success}
-        </div>
-      )}
-
       <form
         onSubmit={handleSubmit}
         className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
       >
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              First Name
-            </label>
-            <input
-              type="text"
-              name="firstName"
-              value={formData.firstName}
-              onChange={handleChange}
-              className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              placeholder="Enter first name"
-            />
-          </div>
+          <InputField label="First Name" name="firstName" value={formData.firstName} onChange={handleChange} placeholder="Enter first name" />
+          <InputField label="Last Name" name="lastName" value={formData.lastName} onChange={handleChange} placeholder="Enter last name" />
+          <InputField label="Email" name="email" type="email" value={formData.email} onChange={handleChange} placeholder="Enter email" />
+          <InputField label="Phone" name="phone" value={formData.phone} onChange={handleChange} placeholder="Enter phone number" />
 
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              Last Name
-            </label>
-            <input
-              type="text"
-              name="lastName"
-              value={formData.lastName}
-              onChange={handleChange}
-              className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              placeholder="Enter last name"
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              Email
-            </label>
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              placeholder="Enter email"
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              Phone
-            </label>
-            <input
-              type="text"
-              name="phone"
-              value={formData.phone}
-              onChange={handleChange}
-              className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              placeholder="Enter phone number"
-            />
-          </div>
-
-          <div>
+          <div className="md:col-span-2">
             <label className="mb-2 block text-sm font-medium text-slate-700">
               Property
             </label>
@@ -478,48 +289,29 @@ export default function AddTenantPage() {
                 <option key={property.id} value={property.id}>
                   {property.name || property.code}
                   {property.code ? ` (${property.code})` : ""}
+                  {property.isOccupied ? " — Occupied" : " — Available"}
                 </option>
               ))}
             </select>
 
             <p className="mt-2 text-xs text-slate-500">
-              Choose the property first, then select one of its available units.
+              The tenant will be linked directly to this property.
             </p>
           </div>
 
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              Unit
-            </label>
-            <select
-              name="unitId"
-              value={formData.unitId}
-              onChange={handleChange}
-              disabled={!formData.propertyId || loadingUnits}
-              className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100"
-            >
-              <option value="">
-                {!formData.propertyId
-                  ? "Select property first"
-                  : loadingUnits
-                  ? "Loading units..."
-                  : availableUnits.length === 0
-                  ? "No available units"
-                  : "Select unit"}
-              </option>
-
-              {availableUnits.map((unit) => (
-                <option key={unit.id} value={unit.id}>
-                  {unit.unitCode}
-                  {unit.unitName ? ` — ${unit.unitName}` : ""}
-                </option>
-              ))}
-            </select>
-
-            <p className="mt-2 text-xs text-slate-500">
-              Only active and available units are shown.
-            </p>
-          </div>
+          {selectedProperty && (
+            <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-4 text-sm text-blue-900 md:col-span-2">
+              <div className="font-semibold">Selected Property Summary</div>
+              <div className="mt-2 grid gap-2 md:grid-cols-3">
+                <div><span className="text-blue-700">Code:</span> {selectedProperty.code || "—"}</div>
+                <div><span className="text-blue-700">Address:</span> {selectedProperty.addressLine1 || "—"}</div>
+                <div><span className="text-blue-700">City:</span> {selectedProperty.city || "—"}</div>
+                <div><span className="text-blue-700">State:</span> {selectedProperty.state || "—"}</div>
+                <div><span className="text-blue-700">Country:</span> {selectedProperty.country || "—"}</div>
+                <div><span className="text-blue-700">Rent:</span> {selectedProperty.monthlyRent ?? "—"}</div>
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-700">
@@ -537,82 +329,10 @@ export default function AddTenantPage() {
             </select>
           </div>
 
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              Lease Start Date
-            </label>
-            <input
-              type="date"
-              name="leaseStart"
-              value={formData.leaseStart}
-              onChange={handleChange}
-              className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              Lease End Date
-            </label>
-            <input
-              type="date"
-              name="leaseEnd"
-              value={formData.leaseEnd}
-              onChange={handleChange}
-              className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              Emergency Contact Name
-            </label>
-            <input
-              type="text"
-              name="emergencyContactName"
-              value={formData.emergencyContactName}
-              onChange={handleChange}
-              className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              placeholder="Emergency contact name"
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              Emergency Contact Phone
-            </label>
-            <input
-              type="text"
-              name="emergencyContactPhone"
-              value={formData.emergencyContactPhone}
-              onChange={handleChange}
-              className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              placeholder="Emergency contact phone"
-            />
-          </div>
-
-          {selectedUnit && (
-            <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-4 text-sm text-blue-900 md:col-span-2">
-              <div className="font-semibold">Selected Unit Summary</div>
-              <div className="mt-2 grid gap-2 md:grid-cols-4">
-                <div>
-                  <span className="text-blue-700">Code:</span> {selectedUnit.unitCode}
-                </div>
-                <div>
-                  <span className="text-blue-700">Floor:</span>{" "}
-                  {selectedUnit.floor ?? "—"}
-                </div>
-                <div>
-                  <span className="text-blue-700">Beds/Baths:</span>{" "}
-                  {selectedUnit.bedrooms ?? "—"} / {selectedUnit.bathrooms ?? "—"}
-                </div>
-                <div>
-                  <span className="text-blue-700">Rent:</span>{" "}
-                  {selectedUnit.monthlyRent ?? "—"}
-                </div>
-              </div>
-            </div>
-          )}
+          <InputField label="Lease Start Date" name="leaseStart" type="date" value={formData.leaseStart} onChange={handleChange} />
+          <InputField label="Lease End Date" name="leaseEnd" type="date" value={formData.leaseEnd} onChange={handleChange} />
+          <InputField label="Emergency Contact Name" name="emergencyContactName" value={formData.emergencyContactName} onChange={handleChange} placeholder="Emergency contact name" />
+          <InputField label="Emergency Contact Phone" name="emergencyContactPhone" value={formData.emergencyContactPhone} onChange={handleChange} placeholder="Emergency contact phone" />
 
           <div className="md:col-span-2">
             <label className="mb-2 block text-sm font-medium text-slate-700">
@@ -642,15 +362,43 @@ export default function AddTenantPage() {
             disabled={saving}
             className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {saving ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4" />
-            )}
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             {saving ? "Saving..." : "Save Tenant"}
           </button>
         </div>
       </form>
+    </div>
+  );
+}
+
+function InputField({
+  label,
+  name,
+  value,
+  onChange,
+  placeholder = "",
+  type = "text",
+}: {
+  label: string;
+  name: string;
+  value: string;
+  onChange: React.ChangeEventHandler<HTMLInputElement>;
+  placeholder?: string;
+  type?: string;
+}) {
+  return (
+    <div>
+      <label className="mb-2 block text-sm font-medium text-slate-700">
+        {label}
+      </label>
+      <input
+        type={type}
+        name={name}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+      />
     </div>
   );
 }
