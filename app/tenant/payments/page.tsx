@@ -20,7 +20,8 @@ import {
 } from "lucide-react";
 import TenantAIWidget from "@/components/TenantAIWidget";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 type Settings = {
   companyName?: string | null;
@@ -128,18 +129,22 @@ export default function TenantPaymentsPage() {
       setPayments(Array.isArray(paymentsData) ? paymentsData : []);
 
       const tenant = meData?.user?.tenant;
-      const activeLease = tenant?.leases?.[0];
 
       const rent =
-        Number(activeLease?.rentAmount) ||
-        Number(activeLease?.monthlyRent) ||
-        Number(activeLease?.rent) ||
-        Number(tenant?.unit?.rent) ||
-        Number(tenant?.unit?.monthlyRent) ||
+        Number(tenant?.monthlyRent) ||
+        Number(tenant?.property?.monthlyRent) ||
         0;
 
       setRentAmount(rent);
-      setForm((prev) => ({ ...prev, amount: rent ? String(rent) : "" }));
+
+      setForm((prev) => ({
+        ...prev,
+        amount: rent ? String(rent) : "",
+      }));
+      
+
+
+
     } catch (err: any) {
       console.error("Tenant payments load error:", err);
       setError(err?.message || "Failed to load payment information.");
