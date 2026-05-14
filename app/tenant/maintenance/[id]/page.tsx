@@ -262,7 +262,7 @@ export default function TenantMaintenanceDetailsPage() {
       const currentUser: AuthUser = meData?.user || null;
       setUser(currentUser);
 
-      const res = await fetch(`${API_URL}/api/maintenance/${id}`, {
+      const res = await fetch(`${API_URL}/api/tenant/maintenance/${id}`, {
         headers: {
           Authorization: `Bearer ${token || ""}`,
         },
