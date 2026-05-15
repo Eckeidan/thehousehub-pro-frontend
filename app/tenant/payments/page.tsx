@@ -502,15 +502,18 @@ export default function TenantPaymentsPage() {
                 </label>
                 <input
                   type="file"
-                  accept="image/jpeg,image/png,image/webp"
+                  accept="image/jpeg,image/png,image/webp,application/pdf,.doc,.docx"
                   onChange={(e) =>
                     setForm((p) => ({
                       ...p,
                       proof: e.target.files?.[0] || null,
                     }))
                   }
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700"
+                  className="w-full rounded-2xl border border-dashed border-emerald-300 bg-emerald-50 px-4 py-4 text-sm text-slate-700 file:mr-4 file:rounded-xl file:border-0 file:bg-emerald-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:bg-emerald-100"
                 />
+                <p className="mt-2 text-xs text-slate-500">
+                  Accepted files: JPG, PNG, WEBP, PDF, DOC, DOCX. Max size: 10MB.
+                </p>
               </div>
 
               <div>
