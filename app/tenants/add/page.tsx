@@ -271,6 +271,11 @@ export default function AddTenantPage() {
     e.preventDefault();
     setError("");
 
+    if (wizardStep !== "review") {
+      continueWizard();
+      return;
+    }
+
     for (const step of WIZARD_STEPS) {
       const validationError = validateStep(step.key);
       if (validationError) {

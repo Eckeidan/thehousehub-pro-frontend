@@ -594,6 +594,11 @@ export default function PropertiesPage() {
     e.preventDefault();
     if (!canEdit) return;
 
+    if (wizardStep !== "review") {
+      continueWizard();
+      return;
+    }
+
     for (const step of WIZARD_STEPS) {
       const validationError = validateWizardStep(step.key);
       if (validationError) {
