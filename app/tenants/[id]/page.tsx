@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
-  User,
   Mail,
   Phone,
   Building2,
@@ -15,17 +14,19 @@ import {
   AlertTriangle,
   DollarSign,
   Landmark,
-  Home,
   BadgeCheck,
   DoorOpen,
-  Layers3,
   UserPlus,
   RefreshCw,
   Copy,
   CheckCircle2,
   X,
   ShieldCheck,
+  CalendarDays,
+  Clock3,
+  MapPin,
 } from "lucide-react";
+import AdminShell from "@/components/AdminShell";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
@@ -46,6 +47,8 @@ interface Property {
   code?: string | null;
   addressLine1?: string | null;
   city?: string | null;
+  state?: string | null;
+  postalCode?: string | null;
   country?: string | null;
   monthlyRent?: string | number | null;
   currentValue?: string | number | null;
@@ -162,6 +165,63 @@ function formatMoney(value?: string | number | null) {
     currency: "USD",
     maximumFractionDigits: 0,
   }).format(num);
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return "Not set";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Not set";
+  return date.toLocaleDateString();
+}
+
+function getOccupancyPeriod(tenant: Tenant) {
+  const start = tenant.leaseStartDate ? new Date(tenant.leaseStartDate) : null;
+  const end = tenant.leaseEndDate ? new Date(tenant.leaseEndDate) : new Date();
+
+  if (!start || Number.isNaN(start.getTime())) {
+    return {
+      label: "Not set",
+      days: null,
+      detail: "Lease start date is missing",
+    };
+  }
+
+  const safeEnd = Number.isNaN(end.getTime()) ? new Date() : end;
+  const dayMs = 1000 * 60 * 60 * 24;
+  const diffDays = Math.max(
+    1,
+    Math.ceil((safeEnd.getTime() - start.getTime()) / dayMs)
+  );
+
+  return {
+    label: `${formatDate(tenant.leaseStartDate)} -> ${
+      tenant.leaseEndDate ? formatDate(tenant.leaseEndDate) : "Present"
+    }`,
+    days: diffDays,
+    detail: tenant.leaseEndDate
+      ? `${diffDays.toLocaleString()} days total`
+      : `${diffDays.toLocaleString()} days so far`,
+  };
+}
+
+function DetailTile({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: ReactNode;
+  detail?: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+        {label}
+      </p>
+      <div className="mt-2 text-sm font-semibold text-slate-950">{value}</div>
+      {detail && <p className="mt-1 text-xs text-slate-500">{detail}</p>}
+    </div>
+  );
 }
 
 function generateRandomPassword(length = 10) {
@@ -508,58 +568,58 @@ export default function TenantDetailsPage() {
 
   if (error || !tenant) {
     return (
-      <div className="mx-auto max-w-4xl space-y-6 p-6">
-        <div className="flex items-center gap-3">
+      <AdminShell
+        user={user}
+        activeItem="tenants"
+        title="Tenant Details"
+        subtitle="Unable to display tenant record."
+        actions={
           <Link
             href="/tenants"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-blue-600"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
           >
-            <ArrowLeft className="h-5 w-5" />
+            <ArrowLeft size={16} />
+            Back
           </Link>
-
-          <div>
-            <h1 className="text-2xl font-bold text-slate-800">
-              Tenant Details
-            </h1>
-            <p className="text-sm text-slate-500">
-              Unable to display tenant record.
-            </p>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700">
+        }
+      >
+        <div className="mx-auto max-w-4xl rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700">
           {error || "Tenant not found."}
         </div>
-      </div>
+      </AdminShell>
     );
   }
 
   const resolvedStatus = getTenantStatus(tenant);
   const rentToDisplay = tenant.unit?.monthlyRent ?? tenant.property?.monthlyRent;
   const tenantHasAccount = !!tenant.user;
+  const occupancyPeriod = getOccupancyPeriod(tenant);
+  const propertyAddress =
+    [
+      tenant.property?.addressLine1,
+      tenant.property?.city,
+      tenant.property?.state,
+      tenant.property?.postalCode,
+      tenant.property?.country,
+    ]
+      .filter(Boolean)
+      .join(", ") || "No address available";
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div className="flex items-start gap-3">
+    <AdminShell
+      user={user}
+      activeItem="tenants"
+      title={`${tenant.firstName} ${tenant.lastName}`}
+      subtitle="Tenant profile, lease status, and property assignment."
+      actions={
+        <>
           <Link
             href="/tenants"
-            className="mt-1 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-blue-600"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
           >
-            <ArrowLeft className="h-5 w-5" />
+            <ArrowLeft size={16} />
+            Back
           </Link>
-
-          <div>
-            <h1 className="text-2xl font-bold text-slate-800">
-              {tenant.firstName} {tenant.lastName}
-            </h1>
-            <p className="mt-1 text-sm text-slate-500">
-              Tenant profile and account overview.
-            </p>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3">
           {canEdit && !tenantHasAccount && (
             <button
               onClick={openCreateAccountModal}
@@ -589,8 +649,10 @@ export default function TenantDetailsPage() {
               Edit Tenant
             </Link>
           )}
-        </div>
-      </div>
+        </>
+      }
+    >
+      <div className="mx-auto max-w-7xl space-y-6">
 
       {isSuperAdmin && (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-700">
@@ -622,135 +684,133 @@ export default function TenantDetailsPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex items-center gap-4">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 text-xl font-bold text-blue-700">
-              {getInitials(tenant.firstName, tenant.lastName)}
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-slate-800">
-                {tenant.firstName} {tenant.lastName}
-              </h2>
-              <p className="text-sm text-slate-500">Tenant ID: #{tenant.id}</p>
-            </div>
-          </div>
+      <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+        <div className="grid grid-cols-1 lg:grid-cols-[0.7fr_0.3fr]">
+          <div className="relative bg-slate-950 p-6 text-white sm:p-8">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.42),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.24),transparent_32%)]" />
+            <div className="relative z-10">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/15 text-2xl font-bold text-white ring-1 ring-white/15">
+                  {getInitials(tenant.firstName, tenant.lastName)}
+                </div>
+                <div>
+                  <p className="inline-flex rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-blue-100">
+                    Tenant Profile
+                  </p>
+                  <h1 className="mt-3 text-4xl font-bold tracking-tight">
+                    {tenant.firstName} {tenant.lastName}
+                  </h1>
+                </div>
+              </div>
 
-          <div className="mt-6 flex flex-wrap gap-2">
-            <span
-              className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusBadge(
-                resolvedStatus
-              )}`}
-            >
-              {resolvedStatus}
-            </span>
-
-            <span
-              className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${leaseBadge(
-                tenant.leaseStatus
-              )}`}
-            >
-              {tenant.leaseStatus || "NO LEASE"}
-            </span>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-            Contact Information
-          </h3>
-
-          <div className="mt-4 space-y-4">
-            <div className="flex items-center gap-3 text-slate-700">
-              <Mail className="h-4 w-4 text-slate-400" />
-              <span>{tenant.email || "N/A"}</span>
-            </div>
-
-            <div className="flex items-center gap-3 text-slate-700">
-              <Phone className="h-4 w-4 text-slate-400" />
-              <span>{tenant.phone || "N/A"}</span>
-            </div>
-
-            {(tenant.emergencyContactName || tenant.emergencyContactPhone) && (
-              <>
-                <div className="border-t border-slate-100 pt-2">
-                  <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Emergency Contact
+              <div className="mt-8 grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div className="rounded-2xl border border-white/10 bg-white/10 p-4">
+                  <p className="text-xs uppercase tracking-wide text-blue-100/70">
+                    Tenant Status
+                  </p>
+                  <p className="mt-2 text-lg font-bold">{resolvedStatus}</p>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/10 p-4">
+                  <p className="text-xs uppercase tracking-wide text-blue-100/70">
+                    Lease Status
+                  </p>
+                  <p className="mt-2 text-lg font-bold">
+                    {tenant.leaseStatus || "No Lease"}
                   </p>
                 </div>
-
-                {tenant.emergencyContactName && (
-                  <div className="flex items-center gap-3 text-slate-700">
-                    <User className="h-4 w-4 text-slate-400" />
-                    <span>{tenant.emergencyContactName}</span>
-                  </div>
-                )}
-
-                {tenant.emergencyContactPhone && (
-                  <div className="flex items-center gap-3 text-slate-700">
-                    <Phone className="h-4 w-4 text-slate-400" />
-                    <span>{tenant.emergencyContactPhone}</span>
-                  </div>
-                )}
-              </>
-            )}
+                <div className="rounded-2xl border border-white/10 bg-white/10 p-4">
+                  <p className="text-xs uppercase tracking-wide text-blue-100/70">
+                    Occupancy Days
+                  </p>
+                  <p className="mt-2 text-lg font-bold">
+                    {occupancyPeriod.days
+                      ? occupancyPeriod.days.toLocaleString()
+                      : "Not set"}
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-            Property Assignment
-          </h3>
-
-          <div className="mt-4 space-y-4">
-            <div className="flex items-center gap-3 text-slate-700">
-              <Building2 className="h-4 w-4 text-slate-400" />
-              <span>
+          <div className="flex flex-col justify-between gap-6 p-6 sm:p-8">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                Assigned Property
+              </p>
+              <p className="mt-3 text-2xl font-bold text-slate-950">
                 {tenant.property?.name || tenant.property?.code || "Not assigned"}
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                {propertyAddress}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <DetailTile label="Rent" value={formatMoney(rentToDisplay)} />
+              <DetailTile label="Unit" value={tenant.unit?.unitCode || "None"} />
+              <DetailTile
+                label="Property Code"
+                value={tenant.property?.code || "N/A"}
+              />
+              <DetailTile
+                label="Account"
+                value={tenantHasAccount ? "Created" : "Not created"}
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[0.62fr_0.38fr]">
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h3 className="text-xl font-bold text-slate-950">Tenant Information</h3>
+
+          <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+            <DetailTile
+              label="Email"
+              value={
+                <span className="inline-flex items-center gap-2">
+                  <Mail className="h-4 w-4 text-slate-400" />
+                  {tenant.email || "N/A"}
+                </span>
+              }
+            />
+            <DetailTile
+              label="Phone"
+              value={
+                <span className="inline-flex items-center gap-2">
+                  <Phone className="h-4 w-4 text-slate-400" />
+                  {tenant.phone || "N/A"}
+                </span>
+              }
+            />
+            <DetailTile label="Tenant ID" value={`#${tenant.id}`} />
+            <DetailTile
+              label="Portal Account"
+              value={tenant.user?.email || "No account"}
+              detail={tenant.user?.mustChangePassword ? "Password change required" : undefined}
+            />
+            <DetailTile
+              label="Emergency Contact"
+              value={tenant.emergencyContactName || "N/A"}
+              detail={tenant.emergencyContactPhone || undefined}
+            />
+            <DetailTile label="Tenant Status" value={
+              <span
+                className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusBadge(
+                  resolvedStatus
+                )}`}
+              >
+                {resolvedStatus}
               </span>
-            </div>
-
-            <div className="flex items-center gap-3 text-slate-700">
-              <Building2 className="h-4 w-4 text-slate-400" />
-              <span>{tenant.property?.addressLine1 || "No address available"}</span>
-            </div>
-
-            <div className="flex items-center gap-3 text-slate-700">
-              <Building2 className="h-4 w-4 text-slate-400" />
-              <span>
-                {[tenant.property?.city, tenant.property?.country]
-                  .filter(Boolean)
-                  .join(", ") || "N/A"}
-              </span>
-            </div>
-
-            <div className="border-t border-slate-100 pt-3" />
-
-            <div className="flex items-center gap-3 text-slate-700">
-              <DoorOpen className="h-4 w-4 text-slate-400" />
-              <span>
-                {tenant.unit?.unitCode || "No unit assigned"}
-                {tenant.unit?.unitName ? ` — ${tenant.unit.unitName}` : ""}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-3 text-slate-700">
-              <Layers3 className="h-4 w-4 text-slate-400" />
-              <span>
-                Floor: {tenant.unit?.floor ?? "—"} | Beds/Baths:{" "}
-                {tenant.unit?.bedrooms ?? "—"} / {tenant.unit?.bathrooms ?? "—"}
-              </span>
-            </div>
+            } />
           </div>
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-            Financial Summary
-          </h3>
-
-          <div className="mt-4 space-y-4">
-            <div className="flex items-center justify-between rounded-xl bg-emerald-50 px-3 py-3">
+          <h3 className="text-xl font-bold text-slate-950">Financial Summary</h3>
+          <div className="mt-5 space-y-3">
+            <div className="flex items-center justify-between rounded-2xl bg-emerald-50 px-4 py-4">
               <div className="flex items-center gap-2 text-emerald-700">
                 <DollarSign className="h-4 w-4" />
                 <span className="text-sm font-medium">Unit Rent</span>
@@ -759,8 +819,7 @@ export default function TenantDetailsPage() {
                 {formatMoney(rentToDisplay)}
               </span>
             </div>
-
-            <div className="flex items-center justify-between rounded-xl bg-violet-50 px-3 py-3">
+            <div className="flex items-center justify-between rounded-2xl bg-violet-50 px-4 py-4">
               <div className="flex items-center gap-2 text-violet-700">
                 <Landmark className="h-4 w-4" />
                 <span className="text-sm font-medium">Property Value</span>
@@ -769,22 +828,7 @@ export default function TenantDetailsPage() {
                 {formatMoney(tenant.property?.currentValue)}
               </span>
             </div>
-
-            <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-3">
-              <div className="flex items-center gap-2 text-slate-700">
-                <Home className="h-4 w-4" />
-                <span className="text-sm font-medium">Unit Occupancy</span>
-              </div>
-              <span
-                className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${occupancyBadge(
-                  tenant.unit?.occupancyStatus
-                )}`}
-              >
-                {tenant.unit?.occupancyStatus || "N/A"}
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-3">
+            <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-4">
               <div className="flex items-center gap-2 text-slate-700">
                 <BadgeCheck className="h-4 w-4" />
                 <span className="text-sm font-medium">Lease Status</span>
@@ -801,18 +845,89 @@ export default function TenantDetailsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-slate-800">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[0.58fr_0.42fr]">
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h3 className="text-xl font-bold text-slate-950">
+            Property Assignment
+          </h3>
+
+          <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+            <DetailTile
+              label="Property"
+              value={
+                <span className="inline-flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-slate-400" />
+                  {tenant.property?.name || tenant.property?.code || "Not assigned"}
+                </span>
+              }
+              detail={tenant.property?.code || undefined}
+            />
+            <DetailTile
+              label="Address"
+              value={
+                <span className="inline-flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-slate-400" />
+                  {propertyAddress}
+                </span>
+              }
+            />
+            <DetailTile
+              label="Property Occupancy"
+              value={
+                <span
+                  className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${occupancyBadge(
+                    tenant.property?.occupancyStatus
+                  )}`}
+                >
+                  {tenant.property?.occupancyStatus || "N/A"}
+                </span>
+              }
+            />
+            <DetailTile
+              label="Assigned Unit"
+              value={
+                <span className="inline-flex items-center gap-2">
+                  <DoorOpen className="h-4 w-4 text-slate-400" />
+                  {tenant.unit?.unitCode || "No unit assigned"}
+                  {tenant.unit?.unitName ? ` - ${tenant.unit.unitName}` : ""}
+                </span>
+              }
+            />
+            <DetailTile label="Floor" value={String(tenant.unit?.floor ?? "-")} />
+            <DetailTile
+              label="Beds / Baths"
+              value={`${tenant.unit?.bedrooms ?? "-"} / ${
+                tenant.unit?.bathrooms ?? "-"
+              }`}
+            />
+            <DetailTile
+              label="Area"
+              value={tenant.unit?.areaSqm ? `${tenant.unit.areaSqm} sqm` : "-"}
+            />
+            <DetailTile
+              label="Unit Occupancy"
+              value={
+                <span
+                  className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${occupancyBadge(
+                    tenant.unit?.occupancyStatus
+                  )}`}
+                >
+                  {tenant.unit?.occupancyStatus || "N/A"}
+                </span>
+              }
+            />
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h3 className="text-xl font-bold text-slate-950">
             Lease Information
           </h3>
 
-          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div className="rounded-xl bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Lease Status
-              </p>
-              <div className="mt-2">
+          <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+            <DetailTile
+              label="Lease Status"
+              value={
                 <span
                   className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${leaseBadge(
                     tenant.leaseStatus
@@ -820,59 +935,50 @@ export default function TenantDetailsPage() {
                 >
                   {tenant.leaseStatus || "N/A"}
                 </span>
-              </div>
-            </div>
-
-            <div className="rounded-xl bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Occupancy Period
-              </p>
-              <p className="mt-2 text-sm font-medium text-slate-800">
-                {tenant.leaseStartDate && tenant.leaseEndDate
-                  ? `${new Date(tenant.leaseStartDate).toLocaleDateString()} → ${new Date(
-                      tenant.leaseEndDate
-                    ).toLocaleDateString()}`
-                  : tenant.leaseStartDate
-                  ? `${new Date(tenant.leaseStartDate).toLocaleDateString()} → Present`
-                  : "Not set"}
-              </p>
-            </div>
-
-            <div className="rounded-xl bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Lease Start
-              </p>
-              <p className="mt-2 text-sm font-medium text-slate-800">
-                {tenant.leaseStartDate
-                  ? new Date(tenant.leaseStartDate).toLocaleDateString()
-                  : "Not set"}
-              </p>
-            </div>
-
-            <div className="rounded-xl bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Lease End
-              </p>
-              <p className="mt-2 text-sm font-medium text-slate-800">
-                {tenant.leaseEndDate
-                  ? new Date(tenant.leaseEndDate).toLocaleDateString()
-                  : "Not set"}
-              </p>
-            </div>
+              }
+            />
+            <DetailTile
+              label="Occupancy Period"
+              value={
+                <span className="inline-flex items-center gap-2">
+                  <Clock3 className="h-4 w-4 text-slate-400" />
+                  {occupancyPeriod.label}
+                </span>
+              }
+              detail={occupancyPeriod.detail}
+            />
+            <DetailTile
+              label="Lease Start"
+              value={
+                <span className="inline-flex items-center gap-2">
+                  <CalendarDays className="h-4 w-4 text-slate-400" />
+                  {formatDate(tenant.leaseStartDate)}
+                </span>
+              }
+            />
+            <DetailTile
+              label="Lease End"
+              value={
+                <span className="inline-flex items-center gap-2">
+                  <CalendarDays className="h-4 w-4 text-slate-400" />
+                  {formatDate(tenant.leaseEndDate)}
+                </span>
+              }
+            />
           </div>
-        </div>
+        </section>
+      </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h3 className="flex items-center gap-2 text-lg font-semibold text-slate-800">
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h3 className="flex items-center gap-2 text-xl font-bold text-slate-950">
             <FileText className="h-5 w-5 text-slate-500" />
             Notes & Remarks
           </h3>
 
-          <div className="mt-4 min-h-[220px] rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-700">
+          <div className="mt-4 min-h-[180px] rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-700">
             {tenant.notes || "No notes available for this tenant."}
           </div>
-        </div>
-      </div>
+      </section>
 
       {showMoveOutModal && canEdit && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -1095,6 +1201,7 @@ export default function TenantDetailsPage() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </AdminShell>
   );
 }
