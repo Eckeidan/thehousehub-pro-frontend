@@ -1344,7 +1344,13 @@ document.getElementById("signupForm").addEventListener("submit", async (e) => {
 };
 
   try {
-    const res = await fetch("http://localhost:4000/api/public/register-landlord", {
+    const apiBase =
+      window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1"
+        ? "http://localhost:4000"
+        : "https://propertyos-backend.onrender.com";
+
+    const res = await fetch(`${apiBase}/api/public/register-landlord`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -1352,7 +1358,7 @@ document.getElementById("signupForm").addEventListener("submit", async (e) => {
       body: JSON.stringify(data),
     });
 
-    const result = await res.json();
+    const result = await res.json().catch(() => ({}));
 
     if (res.ok) {
       form.style.display = "none";
@@ -1363,7 +1369,7 @@ document.getElementById("signupForm").addEventListener("submit", async (e) => {
       btn.disabled = false;
     }
   } catch (err) {
-    alert("Server error");
+    alert("Unable to connect to the server. Please check your internet connection and try again.");
     btn.textContent = "Try Again";
     btn.disabled = false;
   }
