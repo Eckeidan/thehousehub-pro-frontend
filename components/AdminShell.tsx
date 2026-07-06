@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ReactNode, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import {
   LayoutDashboard,
   Building2,
@@ -112,6 +112,8 @@ const menuItems = [
   },
 ];
 
+const SIDEBAR_COLLAPSED_KEY = "thehousehub.adminSidebarCollapsed";
+
 export default function AdminShell({
   user,
   activeItem,
@@ -121,7 +123,17 @@ export default function AdminShell({
   children,
 }: AdminShellProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(false);
+  const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true";
+  });
+
+  useEffect(() => {
+    localStorage.setItem(
+      SIDEBAR_COLLAPSED_KEY,
+      String(desktopSidebarCollapsed)
+    );
+  }, [desktopSidebarCollapsed]);
 
   const normalizedRole = String(user?.role || "").trim().toUpperCase();
 
