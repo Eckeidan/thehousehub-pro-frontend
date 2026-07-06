@@ -21,6 +21,14 @@ import {
   ArrowUp,
   ArrowDown,
   ShieldCheck,
+  Check,
+  Home,
+  MapPin,
+  DollarSign,
+  Camera,
+  ClipboardCheck,
+  Upload,
+  type LucideIcon,
 } from "lucide-react";
 import AdminShell from "@/components/AdminShell";
 
@@ -91,6 +99,14 @@ type StoredUser = {
   organizationId?: string;
 };
 
+type CityOption = {
+  city: string;
+  state: string;
+  postalCode: string;
+};
+
+type WizardStep = "basics" | "location" | "details" | "photos" | "review";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 const PROPERTY_TYPES = [
@@ -106,6 +122,78 @@ const FURNISHING_OPTIONS = [
   { label: "Furnished", value: "FURNISHED" },
   { label: "Unfurnished", value: "UNFURNISHED" },
 ];
+
+const PROPERTY_DRAFT_KEY = "thehousehub.propertyOnboardingDraft.v1";
+
+const WIZARD_STEPS: Array<{
+  key: WizardStep;
+  label: string;
+  icon: LucideIcon;
+}> = [
+  { key: "basics", label: "Basics", icon: Home },
+  { key: "location", label: "Location", icon: MapPin },
+  { key: "details", label: "Details", icon: DollarSign },
+  { key: "photos", label: "Photos", icon: Camera },
+  { key: "review", label: "Review", icon: ClipboardCheck },
+];
+
+const US_CITY_OPTIONS: CityOption[] = [
+  { city: "New York", state: "NY", postalCode: "10001" },
+  { city: "Los Angeles", state: "CA", postalCode: "90001" },
+  { city: "Chicago", state: "IL", postalCode: "60601" },
+  { city: "Houston", state: "TX", postalCode: "77001" },
+  { city: "Phoenix", state: "AZ", postalCode: "85001" },
+  { city: "Philadelphia", state: "PA", postalCode: "19101" },
+  { city: "San Antonio", state: "TX", postalCode: "78201" },
+  { city: "San Diego", state: "CA", postalCode: "92101" },
+  { city: "Dallas", state: "TX", postalCode: "75201" },
+  { city: "San Jose", state: "CA", postalCode: "95101" },
+  { city: "Austin", state: "TX", postalCode: "73301" },
+  { city: "Jacksonville", state: "FL", postalCode: "32099" },
+  { city: "Fort Worth", state: "TX", postalCode: "76101" },
+  { city: "Columbus", state: "OH", postalCode: "43004" },
+  { city: "Charlotte", state: "NC", postalCode: "28201" },
+  { city: "San Francisco", state: "CA", postalCode: "94102" },
+  { city: "Indianapolis", state: "IN", postalCode: "46201" },
+  { city: "Seattle", state: "WA", postalCode: "98101" },
+  { city: "Denver", state: "CO", postalCode: "80201" },
+  { city: "Washington", state: "DC", postalCode: "20001" },
+  { city: "Boston", state: "MA", postalCode: "02108" },
+  { city: "El Paso", state: "TX", postalCode: "79901" },
+  { city: "Nashville", state: "TN", postalCode: "37201" },
+  { city: "Detroit", state: "MI", postalCode: "48201" },
+  { city: "Oklahoma City", state: "OK", postalCode: "73101" },
+  { city: "Portland", state: "OR", postalCode: "97201" },
+  { city: "Las Vegas", state: "NV", postalCode: "89101" },
+  { city: "Memphis", state: "TN", postalCode: "38101" },
+  { city: "Louisville", state: "KY", postalCode: "40201" },
+  { city: "Baltimore", state: "MD", postalCode: "21201" },
+  { city: "Milwaukee", state: "WI", postalCode: "53201" },
+  { city: "Albuquerque", state: "NM", postalCode: "87101" },
+  { city: "Tucson", state: "AZ", postalCode: "85701" },
+  { city: "Fresno", state: "CA", postalCode: "93650" },
+  { city: "Sacramento", state: "CA", postalCode: "94203" },
+  { city: "Mesa", state: "AZ", postalCode: "85201" },
+  { city: "Atlanta", state: "GA", postalCode: "30301" },
+  { city: "Kansas City", state: "MO", postalCode: "64101" },
+  { city: "Colorado Springs", state: "CO", postalCode: "80901" },
+  { city: "Miami", state: "FL", postalCode: "33101" },
+  { city: "Raleigh", state: "NC", postalCode: "27601" },
+  { city: "Omaha", state: "NE", postalCode: "68101" },
+  { city: "Minneapolis", state: "MN", postalCode: "55401" },
+  { city: "Tulsa", state: "OK", postalCode: "74101" },
+  { city: "Wichita", state: "KS", postalCode: "67201" },
+  { city: "New Orleans", state: "LA", postalCode: "70112" },
+  { city: "Cleveland", state: "OH", postalCode: "44101" },
+  { city: "Tampa", state: "FL", postalCode: "33601" },
+  { city: "Orlando", state: "FL", postalCode: "32801" },
+  { city: "Pittsburgh", state: "PA", postalCode: "15201" },
+  { city: "Cincinnati", state: "OH", postalCode: "45201" },
+];
+
+const US_STATE_OPTIONS = Array.from(
+  new Set(US_CITY_OPTIONS.map((option) => option.state))
+).sort((a, b) => a.localeCompare(b));
 
 const createInitialFormData = (): PropertyFormData => ({
   name: "",
@@ -196,6 +284,12 @@ export default function PropertiesPage() {
   const [formData, setFormData] = useState<PropertyFormData>(
     createInitialFormData()
   );
+  const [wizardStep, setWizardStep] = useState<WizardStep>("basics");
+  const [selectedPhotoFiles, setSelectedPhotoFiles] = useState<File[]>([]);
+  const [photoPreviews, setPhotoPreviews] = useState<
+    Array<{ name: string; url: string }>
+  >([]);
+  const [formError, setFormError] = useState("");
 
   const [editingPropertyId, setEditingPropertyId] = useState<string | null>(
     null
@@ -285,22 +379,151 @@ export default function PropertiesPage() {
   }, [checkingAuth]);
 
   useEffect(() => {
+    if (!showAddModal || editingPropertyId) return;
+
+    localStorage.setItem(
+      PROPERTY_DRAFT_KEY,
+      JSON.stringify({
+        formData,
+        wizardStep,
+        updatedAt: new Date().toISOString(),
+      })
+    );
+  }, [formData, wizardStep, showAddModal, editingPropertyId]);
+
+  useEffect(() => {
+    return () => {
+      photoPreviews.forEach((preview) => URL.revokeObjectURL(preview.url));
+    };
+  }, [photoPreviews]);
+
+  useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, cityFilter, typeFilter]);
 
   const handleChange = (
     e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
+    if (formError) setFormError("");
     setFormData((prev) => ({
       ...prev,
       [e.target.name]: e.target.value,
     }));
   };
 
+  const handleCitySearchChange = (value: string) => {
+    if (formError) setFormError("");
+    const selectedCity = US_CITY_OPTIONS.find(
+      (option) =>
+        `${option.city}, ${option.state}`.toLowerCase() ===
+          value.toLowerCase() ||
+        option.city.toLowerCase() === value.toLowerCase()
+    );
+
+    setFormData((prev) => ({
+      ...prev,
+      city: selectedCity?.city || value,
+      state: selectedCity?.state || prev.state,
+      postalCode: selectedCity?.postalCode || prev.postalCode,
+      country: "USA",
+    }));
+  };
+
+  const handlePhotoSelection = (e: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []).filter((file) =>
+      ["image/jpeg", "image/png", "image/webp"].includes(file.type)
+    );
+
+    const nextFiles = [...selectedPhotoFiles, ...files].slice(0, 10);
+    setSelectedPhotoFiles(nextFiles);
+    setPhotoPreviews(
+      nextFiles.map((file) => ({
+        name: file.name,
+        url: URL.createObjectURL(file),
+      }))
+    );
+    e.target.value = "";
+  };
+
+  const removeSelectedPhoto = (index: number) => {
+    const nextFiles = selectedPhotoFiles.filter((_, fileIndex) => fileIndex !== index);
+    setSelectedPhotoFiles(nextFiles);
+    setPhotoPreviews(
+      nextFiles.map((file) => ({
+        name: file.name,
+        url: URL.createObjectURL(file),
+      }))
+    );
+  };
+
+  const currentStepIndex = WIZARD_STEPS.findIndex(
+    (step) => step.key === wizardStep
+  );
+
+  const goToStep = (step: WizardStep) => {
+    setFormError("");
+    setWizardStep(step);
+  };
+
+  const validateWizardStep = (step: WizardStep) => {
+    if (step === "basics") {
+      if (!formData.name.trim()) return "Property name is required.";
+      if (!formData.propertyType) return "Property type is required.";
+    }
+
+    if (step === "location") {
+      if (!formData.addressLine1.trim()) return "Address is required.";
+      if (!formData.city.trim()) return "City is required.";
+      if (!formData.state.trim()) return "State is required.";
+      if (!formData.postalCode.trim()) return "ZIP code is required.";
+    }
+
+    return "";
+  };
+
+  const continueWizard = () => {
+    const validationError = validateWizardStep(wizardStep);
+    if (validationError) {
+      setFormError(validationError);
+      return;
+    }
+
+    setFormError("");
+    const nextStep = WIZARD_STEPS[currentStepIndex + 1]?.key;
+    if (nextStep) setWizardStep(nextStep);
+  };
+
+  const backWizard = () => {
+    setFormError("");
+    const previousStep = WIZARD_STEPS[currentStepIndex - 1]?.key;
+    if (previousStep) setWizardStep(previousStep);
+  };
+
   const openAddModal = () => {
     if (!canEdit) return;
     setEditingPropertyId(null);
-    setFormData(createInitialFormData());
+    const savedDraft = localStorage.getItem(PROPERTY_DRAFT_KEY);
+
+    if (savedDraft) {
+      try {
+        const parsedDraft = JSON.parse(savedDraft);
+        setFormData({
+          ...createInitialFormData(),
+          ...(parsedDraft?.formData || {}),
+        });
+        setWizardStep(parsedDraft?.wizardStep || "basics");
+      } catch {
+        setFormData(createInitialFormData());
+        setWizardStep("basics");
+      }
+    } else {
+      setFormData(createInitialFormData());
+      setWizardStep("basics");
+    }
+
+    setSelectedPhotoFiles([]);
+    setPhotoPreviews([]);
+    setFormError("");
     setShowAddModal(true);
   };
 
@@ -349,22 +572,40 @@ export default function PropertiesPage() {
       ownerName: property.ownerName ?? "",
     });
 
+    setWizardStep("basics");
+    setSelectedPhotoFiles([]);
+    setPhotoPreviews([]);
+    setFormError("");
     setShowAddModal(true);
   };
 
-  const closeModal = () => {
-    if (submitting) return;
+  const closeModal = (force = false) => {
+    if (submitting && !force) return;
     setShowAddModal(false);
     setEditingPropertyId(null);
     setFormData(createInitialFormData());
+    setWizardStep("basics");
+    setSelectedPhotoFiles([]);
+    setPhotoPreviews([]);
+    setFormError("");
   };
 
   const handleSaveProperty = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!canEdit) return;
 
+    for (const step of WIZARD_STEPS) {
+      const validationError = validateWizardStep(step.key);
+      if (validationError) {
+        setWizardStep(step.key);
+        setFormError(validationError);
+        return;
+      }
+    }
+
     try {
       setSubmitting(true);
+      setFormError("");
 
       const token = localStorage.getItem("token");
       const isEditing = editingPropertyId !== null;
@@ -466,11 +707,41 @@ export default function PropertiesPage() {
         );
       }
 
-      closeModal();
+      const savedPropertyId = isEditing ? editingPropertyId : data?.id;
+
+      if (selectedPhotoFiles.length > 0 && savedPropertyId) {
+        const imageFormData = new FormData();
+        selectedPhotoFiles.forEach((file) => {
+          imageFormData.append("images", file);
+        });
+
+        const imageRes = await fetch(
+          `${API_URL}/api/property-images/property/${savedPropertyId}`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token || ""}`,
+            },
+            body: imageFormData,
+          }
+        );
+
+        const imageData = await imageRes.json().catch(() => null);
+
+        if (!imageRes.ok) {
+          throw new Error(imageData?.error || "Failed to upload property photos");
+        }
+      }
+
+      if (!isEditing) {
+        localStorage.removeItem(PROPERTY_DRAFT_KEY);
+      }
+
+      closeModal(true);
       await loadProperties();
     } catch (err: any) {
       console.error("Save property error:", err);
-      alert(err.message || "Failed to save property.");
+      setFormError(err.message || "Failed to save property.");
     } finally {
       setSubmitting(false);
     }
@@ -968,7 +1239,7 @@ export default function PropertiesPage() {
         <div className="fixed inset-0 z-50">
           <div
             className="absolute inset-0 bg-black/30 backdrop-blur-sm"
-            onClick={closeModal}
+            onClick={() => closeModal()}
           />
 
           <div className="absolute inset-y-0 right-0 flex w-full justify-end">
@@ -976,16 +1247,20 @@ export default function PropertiesPage() {
               <div className="flex items-center justify-between border-b border-slate-200 px-5 py-5 sm:px-6">
                 <div>
                   <h3 className="text-2xl font-bold text-slate-900">
-                    {editingPropertyId ? "Edit Property" : "Add New Property"}
+                    {editingPropertyId
+                      ? "Edit Property"
+                      : "Property Onboarding"}
                   </h3>
                   <p className="mt-1 text-sm text-slate-500">
-                    Create the property only. Tenant will be associated later.
+                    {editingPropertyId
+                      ? "Update the property details and optional photos."
+                      : "Follow the steps. Your progress is saved automatically on this device."}
                   </p>
                 </div>
 
                 <button
                   type="button"
-                  onClick={closeModal}
+                  onClick={() => closeModal()}
                   className="rounded-xl p-2 text-slate-500 hover:bg-slate-100"
                 >
                   <X size={18} />
@@ -993,314 +1268,544 @@ export default function PropertiesPage() {
               </div>
 
               <div className="flex-1 overflow-y-auto px-5 py-6 sm:px-6">
+                <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="flex flex-wrap items-center gap-3">
+                    {WIZARD_STEPS.map((step, index) => {
+                      const StepIcon = step.icon;
+                      const isActive = wizardStep === step.key;
+                      const isComplete = index < currentStepIndex;
+
+                      return (
+                        <button
+                          key={step.key}
+                          type="button"
+                          onClick={() => goToStep(step.key)}
+                          className="flex min-w-[112px] flex-1 items-center gap-3 rounded-xl px-3 py-2 text-left transition hover:bg-slate-50"
+                        >
+                          <span
+                            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border text-sm font-semibold ${
+                              isComplete
+                                ? "border-emerald-500 bg-emerald-500 text-white"
+                                : isActive
+                                ? "border-blue-600 bg-blue-600 text-white"
+                                : "border-slate-200 bg-slate-50 text-slate-500"
+                            }`}
+                          >
+                            {isComplete ? <Check size={17} /> : <StepIcon size={17} />}
+                          </span>
+                          <span>
+                            <span className="block text-xs font-semibold uppercase tracking-wide text-slate-400">
+                              Step {index + 1}
+                            </span>
+                            <span
+                              className={`block text-sm font-semibold ${
+                                isActive ? "text-slate-950" : "text-slate-600"
+                              }`}
+                            >
+                              {step.label}
+                            </span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {formError && (
+                  <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+                    {formError}
+                  </div>
+                )}
+
                 <form
                   id="property-form"
                   onSubmit={handleSaveProperty}
-                  className="grid grid-cols-1 gap-4 md:grid-cols-2"
+                  className="space-y-5"
                 >
-                  <div className="md:col-span-2">
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      Property Name
-                    </label>
-                    <input
-                      type="text"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleChange}
-                      placeholder="Sunrise Residence"
-                      className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
-                      required
-                    />
-                  </div>
+                  {wizardStep === "basics" && (
+                    <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <div className="md:col-span-2">
+                        <label className="mb-1 block text-sm font-medium text-slate-700">
+                          Property Name
+                        </label>
+                        <input
+                          type="text"
+                          name="name"
+                          value={formData.name}
+                          onChange={handleChange}
+                          placeholder="Sunrise Residence"
+                          className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
+                          required
+                        />
+                      </div>
 
-                  <div className="md:col-span-2">
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      Address
-                    </label>
-                    <input
-                      type="text"
-                      name="addressLine1"
-                      value={formData.addressLine1}
-                      onChange={handleChange}
-                      placeholder="45 Avenue Example"
-                      className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
-                      required
-                    />
-                  </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-slate-700">
+                          Property Type
+                        </label>
+                        <select
+                          name="propertyType"
+                          value={formData.propertyType}
+                          onChange={handleChange}
+                          className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
+                          required
+                        >
+                          {PROPERTY_TYPES.map((type) => (
+                            <option key={type.value} value={type.value}>
+                              {type.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
-                  <div className="md:col-span-2">
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      Address 2
-                    </label>
-                    <input
-                      type="text"
-                      name="addressLine2"
-                      value={formData.addressLine2}
-                      onChange={handleChange}
-                      placeholder="Apartment, suite, building, floor..."
-                      className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
-                    />
-                  </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-slate-700">
+                          Owner / Landlord
+                        </label>
+                        <input
+                          type="text"
+                          name="ownerName"
+                          value={formData.ownerName}
+                          onChange={handleChange}
+                          placeholder="John Smith"
+                          className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
+                        />
+                      </div>
 
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      City
-                    </label>
-                    <input
-                      type="text"
-                      name="city"
-                      value={formData.city}
-                      onChange={handleChange}
-                      placeholder="Dallas"
-                      className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
-                      required
-                    />
-                  </div>
+                      <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700 md:col-span-2">
+                        <span className="font-semibold">
+                          Property Code Preview:
+                        </span>{" "}
+                        {editingPropertyId
+                          ? properties.find((p) => p.id === editingPropertyId)
+                              ?.code || "Will keep existing code"
+                          : generatePropertyCode(
+                              formData.propertyType,
+                              formData.city || "CITY",
+                              properties
+                            )}
+                      </div>
+                    </section>
+                  )}
 
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      State
-                    </label>
-                    <input
-                      type="text"
-                      name="state"
-                      value={formData.state}
-                      onChange={handleChange}
-                      placeholder="Puerto Rico / TX / CA"
-                      className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
-                    />
-                  </div>
+                  {wizardStep === "location" && (
+                    <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <div className="md:col-span-2">
+                        <label className="mb-1 block text-sm font-medium text-slate-700">
+                          Address
+                        </label>
+                        <input
+                          type="text"
+                          name="addressLine1"
+                          value={formData.addressLine1}
+                          onChange={handleChange}
+                          placeholder="45 Avenue Example"
+                          className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
+                          required
+                        />
+                      </div>
 
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      ZIP Code
-                    </label>
-                    <input
-                      type="text"
-                      name="postalCode"
-                      value={formData.postalCode}
-                      onChange={handleChange}
-                      placeholder="75001"
-                      className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
-                    />
-                  </div>
+                      <div className="md:col-span-2">
+                        <label className="mb-1 block text-sm font-medium text-slate-700">
+                          Address 2
+                        </label>
+                        <input
+                          type="text"
+                          name="addressLine2"
+                          value={formData.addressLine2}
+                          onChange={handleChange}
+                          placeholder="Apartment, suite, building, floor..."
+                          className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
+                        />
+                      </div>
 
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      Country
-                    </label>
-                    <input
-                      type="text"
-                      name="country"
-                      value={formData.country}
-                      onChange={handleChange}
-                      placeholder="USA "
-                      className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
-                    />
-                  </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-slate-700">
+                          City
+                        </label>
+                        <input
+                          type="text"
+                          list="us-city-options"
+                          name="city"
+                          value={formData.city}
+                          onChange={(e) => handleCitySearchChange(e.target.value)}
+                          placeholder="Search city, e.g. Dallas, TX"
+                          className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
+                          required
+                        />
+                        <datalist id="us-city-options">
+                          {US_CITY_OPTIONS.map((option) => (
+                            <option
+                              key={`${option.city}-${option.state}`}
+                              value={`${option.city}, ${option.state}`}
+                            >
+                              {option.postalCode}
+                            </option>
+                          ))}
+                        </datalist>
+                      </div>
 
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      Property Type
-                    </label>
-                    <select
-                      name="propertyType"
-                      value={formData.propertyType}
-                      onChange={handleChange}
-                      className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
-                      required
-                    >
-                      {PROPERTY_TYPES.map((type) => (
-                        <option key={type.value} value={type.value}>
-                          {type.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-slate-700">
+                          State
+                        </label>
+                        <select
+                          name="state"
+                          value={formData.state}
+                          onChange={handleChange}
+                          className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
+                          required
+                        >
+                          <option value="">Select state</option>
+                          {US_STATE_OPTIONS.map((state) => (
+                            <option key={state} value={state}>
+                              {state}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
-                  <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700 md:col-span-2">
-                    <span className="font-semibold">
-                      Property Code Preview:
-                    </span>{" "}
-                    {editingPropertyId
-                      ? properties.find((p) => p.id === editingPropertyId)
-                          ?.code || "Will keep existing code"
-                      : generatePropertyCode(
-                          formData.propertyType,
-                          formData.city || "CITY",
-                          properties
-                        )}
-                  </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-slate-700">
+                          ZIP Code
+                        </label>
+                        <input
+                          type="text"
+                          name="postalCode"
+                          value={formData.postalCode}
+                          onChange={handleChange}
+                          placeholder="75001"
+                          className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
+                          required
+                        />
+                      </div>
 
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      Monthly Rent
-                    </label>
-                    <input
-                      type="number"
-                      name="monthlyRent"
-                      value={formData.monthlyRent}
-                      onChange={handleChange}
-                      placeholder="1200"
-                      min="0"
-                      step="0.01"
-                      className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
-                    />
-                  </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-slate-700">
+                          Country
+                        </label>
+                        <input
+                          type="text"
+                          name="country"
+                          value={formData.country}
+                          onChange={handleChange}
+                          placeholder="USA"
+                          className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    </section>
+                  )}
 
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      Owner / Landlord
-                    </label>
-                    <input
-                      type="text"
-                      name="ownerName"
-                      value={formData.ownerName}
-                      onChange={handleChange}
-                      placeholder="John Smith"
-                      className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
-                    />
-                  </div>
+                  {wizardStep === "details" && (
+                    <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-slate-700">
+                          Monthly Rent
+                        </label>
+                        <input
+                          type="number"
+                          name="monthlyRent"
+                          value={formData.monthlyRent}
+                          onChange={handleChange}
+                          placeholder="1200"
+                          min="0"
+                          step="0.01"
+                          className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
+                        />
+                      </div>
 
-                  <div className="md:col-span-2">
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      Description
-                    </label>
-                    <textarea
-                      name="description"
-                      value={formData.description}
-                      onChange={handleChange}
-                      rows={3}
-                      placeholder="Beautiful furnished apartment..."
-                      className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
-                    />
-                  </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-slate-700">
+                          Available From
+                        </label>
+                        <input
+                          type="date"
+                          name="availableFrom"
+                          value={formData.availableFrom}
+                          onChange={handleChange}
+                          className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
+                        />
+                      </div>
 
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      Bedrooms
-                    </label>
-                    <input
-                      type="number"
-                      name="bedrooms"
-                      value={formData.bedrooms}
-                      onChange={handleChange}
-                      min="0"
-                      className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
-                    />
-                  </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-slate-700">
+                          Bedrooms
+                        </label>
+                        <input
+                          type="number"
+                          name="bedrooms"
+                          value={formData.bedrooms}
+                          onChange={handleChange}
+                          min="0"
+                          className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
+                        />
+                      </div>
 
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      Bathrooms
-                    </label>
-                    <input
-                      type="number"
-                      name="bathrooms"
-                      value={formData.bathrooms}
-                      onChange={handleChange}
-                      min="0"
-                      className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
-                    />
-                  </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-slate-700">
+                          Bathrooms
+                        </label>
+                        <input
+                          type="number"
+                          name="bathrooms"
+                          value={formData.bathrooms}
+                          onChange={handleChange}
+                          min="0"
+                          className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
+                        />
+                      </div>
 
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      Area sqm
-                    </label>
-                    <input
-                      type="number"
-                      name="areaSqm"
-                      value={formData.areaSqm}
-                      onChange={handleChange}
-                      min="0"
-                      step="0.01"
-                      className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
-                    />
-                  </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-slate-700">
+                          Area sqm
+                        </label>
+                        <input
+                          type="number"
+                          name="areaSqm"
+                          value={formData.areaSqm}
+                          onChange={handleChange}
+                          min="0"
+                          step="0.01"
+                          className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
+                        />
+                      </div>
 
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      Floor
-                    </label>
-                    <input
-                      type="number"
-                      name="floor"
-                      value={formData.floor}
-                      onChange={handleChange}
-                      className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
-                    />
-                  </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-slate-700">
+                          Floor
+                        </label>
+                        <input
+                          type="number"
+                          name="floor"
+                          value={formData.floor}
+                          onChange={handleChange}
+                          className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
+                        />
+                      </div>
 
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      Furnishing
-                    </label>
-                    <select
-                      name="furnishingStatus"
-                      value={formData.furnishingStatus}
-                      onChange={handleChange}
-                      className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
-                    >
-                      {FURNISHING_OPTIONS.map((item) => (
-                        <option key={item.value} value={item.value}>
-                          {item.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-slate-700">
+                          Furnishing
+                        </label>
+                        <select
+                          name="furnishingStatus"
+                          value={formData.furnishingStatus}
+                          onChange={handleChange}
+                          className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
+                        >
+                          {FURNISHING_OPTIONS.map((item) => (
+                            <option key={item.value} value={item.value}>
+                              {item.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      Parking Spaces
-                    </label>
-                    <input
-                      type="number"
-                      name="parkingSpaces"
-                      value={formData.parkingSpaces}
-                      onChange={handleChange}
-                      min="0"
-                      className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
-                    />
-                  </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-slate-700">
+                          Parking Spaces
+                        </label>
+                        <input
+                          type="number"
+                          name="parkingSpaces"
+                          value={formData.parkingSpaces}
+                          onChange={handleChange}
+                          min="0"
+                          className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
+                        />
+                      </div>
 
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      Available From
-                    </label>
-                    <input
-                      type="date"
-                      name="availableFrom"
-                      value={formData.availableFrom}
-                      onChange={handleChange}
-                      className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
-                    />
-                  </div>
+                      <div className="md:col-span-2">
+                        <label className="mb-1 block text-sm font-medium text-slate-700">
+                          Description
+                        </label>
+                        <textarea
+                          name="description"
+                          value={formData.description}
+                          onChange={handleChange}
+                          rows={4}
+                          placeholder="Beautiful furnished apartment..."
+                          className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    </section>
+                  )}
+
+                  {wizardStep === "photos" && (
+                    <section className="space-y-4">
+                      <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-blue-300 bg-blue-50/60 px-6 py-10 text-center transition hover:border-blue-500 hover:bg-blue-50">
+                        <Upload className="mb-3 text-blue-600" size={28} />
+                        <span className="text-sm font-semibold text-slate-900">
+                          Upload property photos
+                        </span>
+                        <span className="mt-1 text-sm text-slate-500">
+                          JPG, PNG, or WEBP. Up to 10 photos.
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          multiple
+                          onChange={handlePhotoSelection}
+                          className="sr-only"
+                        />
+                      </label>
+
+                      {photoPreviews.length > 0 ? (
+                        <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                          {photoPreviews.map((preview, index) => (
+                            <div
+                              key={`${preview.name}-${preview.url}`}
+                              className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-100"
+                            >
+                              <img
+                                src={preview.url}
+                                alt={preview.name}
+                                className="h-32 w-full object-cover"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removeSelectedPhoto(index)}
+                                className="absolute right-2 top-2 rounded-full bg-white/90 p-1 text-slate-700 shadow-sm hover:bg-white"
+                              >
+                                <X size={16} />
+                              </button>
+                              <div className="truncate px-3 py-2 text-xs font-medium text-slate-600">
+                                {preview.name}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                          Photos are optional, but they help investors and tenants inspect the asset faster.
+                        </div>
+                      )}
+                    </section>
+                  )}
+
+                  {wizardStep === "review" && (
+                    <section className="space-y-4">
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                            Property
+                          </p>
+                          <p className="mt-2 text-lg font-bold text-slate-950">
+                            {formData.name || "Unnamed property"}
+                          </p>
+                          <p className="mt-1 text-sm text-slate-500">
+                            {PROPERTY_TYPES.find(
+                              (type) => type.value === formData.propertyType
+                            )?.label || formData.propertyType}
+                          </p>
+                        </div>
+
+                        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                            Location
+                          </p>
+                          <p className="mt-2 text-sm font-semibold text-slate-900">
+                            {formData.addressLine1 || "No address"}
+                          </p>
+                          <p className="mt-1 text-sm text-slate-500">
+                            {[formData.city, formData.state, formData.postalCode]
+                              .filter(Boolean)
+                              .join(", ") || "No city selected"}
+                          </p>
+                        </div>
+
+                        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                            Financials
+                          </p>
+                          <p className="mt-2 text-lg font-bold text-slate-950">
+                            {formData.monthlyRent
+                              ? `$${Number(formData.monthlyRent).toLocaleString()} / mo`
+                              : "Rent not set"}
+                          </p>
+                          <p className="mt-1 text-sm text-slate-500">
+                            {formData.bedrooms || 0} bed / {formData.bathrooms || 0} bath
+                          </p>
+                        </div>
+
+                        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                            Photos
+                          </p>
+                          <p className="mt-2 text-lg font-bold text-slate-950">
+                            {photoPreviews.length} selected
+                          </p>
+                          <p className="mt-1 text-sm text-slate-500">
+                            Photos will upload after the property record is saved.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                        <span className="font-semibold">
+                          Property Code Preview:
+                        </span>{" "}
+                        {editingPropertyId
+                          ? properties.find((p) => p.id === editingPropertyId)
+                              ?.code || "Will keep existing code"
+                          : generatePropertyCode(
+                              formData.propertyType,
+                              formData.city || "CITY",
+                              properties
+                            )}
+                      </div>
+                    </section>
+                  )}
                 </form>
               </div>
 
-              <div className="flex items-center justify-end gap-3 border-t border-slate-200 bg-white px-5 py-4 sm:px-6">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-white px-5 py-4 sm:px-6">
                 <button
                   type="button"
-                  onClick={closeModal}
+                  onClick={() => closeModal()}
                   className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
                   disabled={submitting}
                 >
                   Cancel
                 </button>
 
-                <button
-                  type="submit"
-                  form="property-form"
-                  className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-                  disabled={submitting}
-                >
-                  {submitting
-                    ? "Saving..."
-                    : editingPropertyId
-                    ? "Update Property"
-                    : "Save Property"}
-                </button>
+                <div className="flex items-center gap-3">
+                  {currentStepIndex > 0 && (
+                    <button
+                      type="button"
+                      onClick={backWizard}
+                      className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                      disabled={submitting}
+                    >
+                      Back
+                    </button>
+                  )}
+
+                  {wizardStep !== "review" ? (
+                    <button
+                      type="button"
+                      onClick={continueWizard}
+                      className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={submitting}
+                    >
+                      Continue
+                      <ChevronRight size={16} />
+                    </button>
+                  ) : (
+                    <button
+                      type="submit"
+                      form="property-form"
+                      className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={submitting}
+                    >
+                      {submitting
+                        ? "Saving..."
+                        : editingPropertyId
+                        ? "Update Property"
+                        : "Save Property"}
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
