@@ -13,9 +13,10 @@ import {
   Brain,
   Settings,
   LogOut,
-  Home,
   Menu,
   X,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 
 type StoredUser = {
@@ -120,6 +121,7 @@ export default function AdminShell({
   children,
 }: AdminShellProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(false);
 
   const normalizedRole = String(user?.role || "").trim().toUpperCase();
 
@@ -154,12 +156,14 @@ export default function AdminShell({
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col bg-gradient-to-b from-blue-950 via-blue-900 to-slate-900 text-white shadow-2xl transition-transform duration-300 lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col bg-gradient-to-b from-blue-950 via-blue-900 to-slate-900 text-white shadow-2xl transition-all duration-300 lg:translate-x-0 ${
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        } ${desktopSidebarCollapsed ? "lg:w-24" : "lg:w-72"}`}
       >
-        <div className="flex items-center justify-between border-b border-white/10 px-6 py-7">
-          <div>
+        <div className={`flex items-center justify-between border-b border-white/10 px-6 py-7 ${
+          desktopSidebarCollapsed ? "lg:px-4" : ""
+        }`}>
+          <div className={desktopSidebarCollapsed ? "lg:hidden" : ""}>
             <h1 className="text-3xl font-bold tracking-tight">
               <span className="text-white">The House</span>{" "}
               <span className="text-emerald-400">Hub</span>
@@ -169,16 +173,29 @@ export default function AdminShell({
             </p>
           </div>
 
+          <div
+            className={`hidden h-12 w-12 items-center justify-center rounded-2xl bg-white/10 text-lg font-black text-white lg:flex ${
+              desktopSidebarCollapsed ? "" : "lg:hidden"
+            }`}
+          >
+            HH
+          </div>
+
           <button
             onClick={() => setMobileMenuOpen(false)}
             className="rounded-xl bg-white/10 p-2 text-white lg:hidden"
+            aria-label="Close navigation"
           >
             <X size={20} />
           </button>
         </div>
 
         <nav className="flex-1 overflow-y-auto px-4 py-6">
-          <p className="mb-3 px-3 text-xs font-semibold uppercase tracking-widest text-blue-200/50">
+          <p
+            className={`mb-3 px-3 text-xs font-semibold uppercase tracking-widest text-blue-200/50 ${
+              desktopSidebarCollapsed ? "lg:text-center lg:text-[10px]" : ""
+            }`}
+          >
             Main Menu
           </p>
 
@@ -192,27 +209,40 @@ export default function AdminShell({
                   activeItem === item.key
                     ? "bg-white/15 text-white shadow"
                     : "text-blue-100/80 hover:bg-white/10 hover:text-white"
-                }`}
+                } ${desktopSidebarCollapsed ? "lg:justify-center lg:px-3" : ""}`}
+                title={desktopSidebarCollapsed ? item.label : undefined}
               >
-                <span>{item.icon}</span>
-                <span>{item.label}</span>
+                <span className="shrink-0">{item.icon}</span>
+                <span className={desktopSidebarCollapsed ? "lg:hidden" : ""}>
+                  {item.label}
+                </span>
               </Link>
             ))}
           </div>
         </nav>
 
-        <div className="border-t border-white/10 px-6 py-5">
-          <p className="text-xs uppercase tracking-widest text-blue-200/50">
+        <div className={`border-t border-white/10 px-6 py-5 ${
+          desktopSidebarCollapsed ? "lg:px-4" : ""
+        }`}>
+          <p className={`text-xs uppercase tracking-widest text-blue-200/50 ${
+            desktopSidebarCollapsed ? "lg:text-center lg:text-[10px]" : ""
+          }`}>
             Current Role
           </p>
-          <p className="mt-1 text-sm text-blue-100">{displayRole}</p>
+          <p className={`mt-1 text-sm text-blue-100 ${
+            desktopSidebarCollapsed ? "lg:text-center lg:text-xs" : ""
+          }`}>
+            {displayRole}
+          </p>
 
-          <div className="mt-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/10 px-3 py-3">
+          <div className={`mt-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/10 px-3 py-3 ${
+            desktopSidebarCollapsed ? "lg:justify-center lg:px-2" : ""
+          }`}>
             <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-500 text-sm font-bold text-white">
               {initials}
             </div>
 
-            <div className="min-w-0">
+            <div className={`min-w-0 ${desktopSidebarCollapsed ? "lg:hidden" : ""}`}>
               <p className="truncate text-sm font-semibold text-white">
                 {user?.fullName || user?.name || "User"}
               </p>
@@ -225,23 +255,54 @@ export default function AdminShell({
 
           <button
             onClick={handleLogout}
-            className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-200 transition hover:bg-red-500/20 hover:text-white"
+            className={`mt-5 flex w-full items-center justify-center gap-2 rounded-2xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-200 transition hover:bg-red-500/20 hover:text-white ${
+              desktopSidebarCollapsed ? "lg:px-3" : ""
+            }`}
+            title={desktopSidebarCollapsed ? "Logout" : undefined}
           >
             <LogOut size={16} />
-            Logout
+            <span className={desktopSidebarCollapsed ? "lg:hidden" : ""}>
+              Logout
+            </span>
           </button>
         </div>
       </aside>
 
-      <main className="min-h-screen lg:ml-72">
+      <main
+        className={`min-h-screen transition-all duration-300 ${
+          desktopSidebarCollapsed ? "lg:ml-24" : "lg:ml-72"
+        }`}
+      >
         <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur">
           <div className="flex flex-col gap-4 px-4 py-4 sm:px-6 md:px-8 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-start gap-3">
               <button
                 onClick={() => setMobileMenuOpen(true)}
                 className="mt-1 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm lg:hidden"
+                aria-label="Open navigation"
               >
                 <Menu size={20} />
+              </button>
+
+              <button
+                onClick={() => setDesktopSidebarCollapsed((value) => !value)}
+                className="mt-1 hidden h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50 lg:inline-flex"
+                aria-label={
+                  desktopSidebarCollapsed
+                    ? "Show sidebar"
+                    : "Hide sidebar"
+                }
+                title={
+                  desktopSidebarCollapsed
+                    ? "Show sidebar"
+                    : "Hide sidebar"
+                }
+              >
+                {desktopSidebarCollapsed ? (
+                  <PanelLeftOpen size={20} />
+                ) : (
+                  <PanelLeftClose size={20} />
+                )}
               </button>
 
               <div>

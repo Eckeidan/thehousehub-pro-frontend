@@ -205,7 +205,6 @@ export default function TenantPortalPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
@@ -333,8 +332,8 @@ export default function TenantPortalPage() {
     setPasswordError("");
     setPasswordSuccess("");
 
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      setPasswordError("All fields are required.");
+    if (!newPassword || !confirmPassword) {
+      setPasswordError("New password and confirmation are required.");
       return;
     }
 
@@ -360,7 +359,6 @@ export default function TenantPortalPage() {
           Authorization: `Bearer ${token || ""}`,
         },
         body: JSON.stringify({
-          currentPassword,
           newPassword,
           confirmPassword,
         }),
@@ -381,7 +379,6 @@ export default function TenantPortalPage() {
       setUser(updatedUser);
 
       setPasswordSuccess("Password changed successfully.");
-      setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
 
@@ -520,13 +517,6 @@ export default function TenantPortalPage() {
             </div>
 
             <form onSubmit={handleChangePassword} className="space-y-4">
-              <PasswordInput
-                label="Current temporary password"
-                value={currentPassword}
-                onChange={setCurrentPassword}
-                placeholder="Enter current password"
-              />
-
               <PasswordInput
                 label="New password"
                 value={newPassword}

@@ -58,7 +58,6 @@ export default function DashboardPage() {
   const [user, setUser] = useState<StoredUser | null>(null);
 
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
@@ -168,8 +167,8 @@ return;
     setPasswordError("");
     setPasswordSuccess("");
 
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      setPasswordError("All fields are required.");
+    if (!newPassword || !confirmPassword) {
+      setPasswordError("New password and confirmation are required.");
       return;
     }
 
@@ -195,7 +194,6 @@ return;
           Authorization: `Bearer ${token || ""}`,
         },
         body: JSON.stringify({
-          currentPassword,
           newPassword,
           confirmPassword,
         }),
@@ -217,7 +215,6 @@ return;
       setUser(updatedUser);
 
       setPasswordSuccess("Password changed successfully.");
-      setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
 
@@ -313,19 +310,6 @@ return;
             </div>
 
             <form onSubmit={handleChangePassword} className="space-y-4">
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-700">
-                  Current temporary password
-                </label>
-                <input
-                  type="password"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                  placeholder="Enter current password"
-                />
-              </div>
-
               <div>
                 <label className="mb-2 block text-sm font-semibold text-slate-700">
                   New password
