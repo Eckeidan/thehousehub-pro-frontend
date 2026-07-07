@@ -9,12 +9,14 @@ import {
   CircleDollarSign,
   Clock3,
   Eye,
+  KeyRound,
   Loader2,
   LogOut,
   Moon,
   Search,
   ShieldCheck,
   Sun,
+  UserPlus,
   Users,
 } from "lucide-react";
 
@@ -206,6 +208,15 @@ export default function SuperOwnerPage() {
   const [permissions, setPermissions] = useState<PermissionsResponse | null>(null);
   const [search, setSearch] = useState("");
   const [supportBusyId, setSupportBusyId] = useState("");
+  const [creatingSuperOwner, setCreatingSuperOwner] = useState(false);
+  const [createSuperOwnerMessage, setCreateSuperOwnerMessage] = useState("");
+  const [newSuperOwnerForm, setNewSuperOwnerForm] = useState({
+    fullName: "",
+    email: "",
+    temporaryPassword: "",
+    platformAccessAll: false,
+    platformPermissions: [] as string[],
+  });
 
   const t = themeClass[theme];
   const can = useCallback(
@@ -215,6 +226,7 @@ export default function SuperOwnerPage() {
       permissions?.permissions?.includes("*"),
     [permissions]
   );
+  const canCreateSuperOwner = can("super_owner:create");
 
   useEffect(() => {
     const savedTheme = localStorage.getItem(THEME_KEY);
@@ -355,6 +367,65 @@ export default function SuperOwnerPage() {
     }
   }
 
+  async function createSuperOwnerAccount(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    setCreateSuperOwnerMessage("");
+
+    if (!canCreateSuperOwner) {
+      setError("Missing permission: super_owner:create");
+      return;
+    }
+
+    try {
+      setCreatingSuperOwner(true);
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/api/super-owner/users`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token || ""}`,
+        },
+        body: JSON.stringify(newSuperOwnerForm),
+      });
+
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || "Failed to create super owner.");
+
+      setCreateSuperOwnerMessage(
+        "Super Owner account created. They must change the temporary password at first login."
+      );
+      setNewSuperOwnerForm({
+        fullName: "",
+        email: "",
+        temporaryPassword: "",
+        platformAccessAll: false,
+        platformPermissions: [],
+      });
+      await loadPlatform();
+    } catch (createError) {
+      setError(
+        createError instanceof Error
+          ? createError.message
+          : "Failed to create super owner."
+      );
+    } finally {
+      setCreatingSuperOwner(false);
+    }
+  }
+
+  function toggleNewSuperOwnerPermission(permission: string) {
+    setNewSuperOwnerForm((current) => {
+      const exists = current.platformPermissions.includes(permission);
+      return {
+        ...current,
+        platformPermissions: exists
+          ? current.platformPermissions.filter((item) => item !== permission)
+          : [...current.platformPermissions, permission],
+      };
+    });
+  }
+
   function logout() {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
@@ -468,6 +539,141 @@ export default function SuperOwnerPage() {
               </span>
             ))}
           </div>
+        </section>
+
+        <section className={`rounded-3xl border p-5 ${t.card}`}>
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div>
+              <h2 className={`flex items-center gap-2 text-xl font-bold ${t.title}`}>
+                <UserPlus size={20} />
+                Create Super Owner
+              </h2>
+              <p className={`mt-1 max-w-2xl text-sm ${t.muted}`}>
+                Create another platform administrator and assign only the responsibilities they need.
+              </p>
+            </div>
+            <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${t.chip}`}>
+              Required: super_owner:create
+            </span>
+          </div>
+
+          {!canCreateSuperOwner ? (
+            <div className={`mt-5 rounded-2xl border p-4 text-sm ${t.softCard}`}>
+              You can view this area, but your account cannot create another Super Owner.
+            </div>
+          ) : (
+            <form onSubmit={createSuperOwnerAccount} className="mt-5 space-y-5">
+              {createSuperOwnerMessage && (
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                  {createSuperOwnerMessage}
+                </div>
+              )}
+
+              <div className="grid gap-4 md:grid-cols-3">
+                <InputField
+                  label="Full Name"
+                  value={newSuperOwnerForm.fullName}
+                  onChange={(value) =>
+                    setNewSuperOwnerForm((current) => ({ ...current, fullName: value }))
+                  }
+                  theme={theme}
+                />
+                <InputField
+                  label="Email"
+                  type="email"
+                  value={newSuperOwnerForm.email}
+                  onChange={(value) =>
+                    setNewSuperOwnerForm((current) => ({ ...current, email: value }))
+                  }
+                  theme={theme}
+                />
+                <InputField
+                  label="Temporary Password"
+                  type="password"
+                  value={newSuperOwnerForm.temporaryPassword}
+                  onChange={(value) =>
+                    setNewSuperOwnerForm((current) => ({
+                      ...current,
+                      temporaryPassword: value,
+                    }))
+                  }
+                  theme={theme}
+                  icon={<KeyRound size={15} />}
+                />
+              </div>
+
+              <label className={`flex items-start gap-3 rounded-2xl border p-4 ${t.softCard}`}>
+                <input
+                  type="checkbox"
+                  checked={newSuperOwnerForm.platformAccessAll}
+                  disabled={!permissions?.accessAll}
+                  onChange={(event) =>
+                    setNewSuperOwnerForm((current) => ({
+                      ...current,
+                      platformAccessAll: event.target.checked,
+                    }))
+                  }
+                  className="mt-1 h-4 w-4 rounded border-slate-300"
+                />
+                <span>
+                  <span className={`block text-sm font-semibold ${t.title}`}>
+                    Platform root access
+                  </span>
+                  <span className={`block text-sm ${t.muted}`}>
+                    Grants all current and future platform permissions. Only a root Super Owner can grant this.
+                  </span>
+                </span>
+              </label>
+
+              {!newSuperOwnerForm.platformAccessAll && (
+                <div>
+                  <p className={`mb-3 text-sm font-semibold ${t.title}`}>
+                    Responsibilities
+                  </p>
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    {(permissions?.availablePermissions || [])
+                      .filter((permission) => permission !== "super_owner:create" || permissions?.accessAll)
+                      .map((permission) => (
+                        <label
+                          key={permission}
+                          className={`flex items-start gap-3 rounded-2xl border p-3 ${t.softCard}`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={newSuperOwnerForm.platformPermissions.includes(permission)}
+                            onChange={() => toggleNewSuperOwnerPermission(permission)}
+                            className="mt-1 h-4 w-4 rounded border-slate-300"
+                          />
+                          <span>
+                            <span className={`block text-sm font-semibold ${t.title}`}>
+                              {permission}
+                            </span>
+                            <span className={`block text-xs ${t.subtle}`}>
+                              ABAC responsibility
+                            </span>
+                          </span>
+                        </label>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={creatingSuperOwner}
+                  className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {creatingSuperOwner ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <UserPlus size={16} />
+                  )}
+                  {creatingSuperOwner ? "Creating..." : "Create Super Owner"}
+                </button>
+              </div>
+            </form>
+          )}
         </section>
 
         <section className="grid gap-6 xl:grid-cols-[0.58fr_0.42fr]">
@@ -697,6 +903,47 @@ function MiniStat({
       <p className={`font-bold ${t.title}`}>{value}</p>
       <p className={`mt-1 ${t.subtle}`}>{label}</p>
     </div>
+  );
+}
+
+function InputField({
+  label,
+  value,
+  onChange,
+  theme,
+  type = "text",
+  icon,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  theme: ThemeMode;
+  type?: string;
+  icon?: React.ReactNode;
+}) {
+  const t = themeClass[theme];
+
+  return (
+    <label className="block">
+      <span className={`mb-2 block text-sm font-semibold ${t.title}`}>
+        {label}
+      </span>
+      <span className="relative block">
+        {icon && (
+          <span className={`pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 ${t.subtle}`}>
+            {icon}
+          </span>
+        )}
+        <input
+          type={type}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className={`w-full rounded-2xl border px-4 py-3 text-sm outline-none transition ${
+            icon ? "pl-10" : ""
+          } ${t.input}`}
+        />
+      </span>
+    </label>
   );
 }
 
