@@ -14,6 +14,8 @@ import {
   Settings,
   LogOut,
   Menu,
+  Moon,
+  Sun,
   X,
   PanelLeftClose,
   PanelLeftOpen,
@@ -114,6 +116,8 @@ const menuItems = [
 ];
 
 const SIDEBAR_COLLAPSED_KEY = "thehousehub.adminSidebarCollapsed";
+const THEME_KEY = "thehousehub.theme";
+const LEGACY_SUPER_OWNER_THEME_KEY = "thehousehub.superOwnerTheme";
 
 export default function AdminShell({
   user,
@@ -128,6 +132,13 @@ export default function AdminShell({
     if (typeof window === "undefined") return false;
     return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true";
   });
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    if (typeof window === "undefined") return "light";
+    const savedTheme =
+      localStorage.getItem(THEME_KEY) ||
+      localStorage.getItem(LEGACY_SUPER_OWNER_THEME_KEY);
+    return savedTheme === "dark" || savedTheme === "light" ? savedTheme : "light";
+  });
 
   useEffect(() => {
     localStorage.setItem(
@@ -135,6 +146,16 @@ export default function AdminShell({
       String(desktopSidebarCollapsed)
     );
   }, [desktopSidebarCollapsed]);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", theme === "dark");
+    localStorage.setItem(THEME_KEY, theme);
+    localStorage.setItem(LEGACY_SUPER_OWNER_THEME_KEY, theme);
+  }, [theme]);
+
+  function toggleTheme() {
+    setTheme((current) => (current === "dark" ? "light" : "dark"));
+  }
 
   const normalizedRole = String(user?.role || "").trim().toUpperCase();
 
@@ -158,7 +179,7 @@ export default function AdminShell({
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900">
+    <div className="min-h-screen bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       {mobileMenuOpen && (
         <div
           className="fixed inset-0 z-40 bg-slate-900/50 lg:hidden"
@@ -284,12 +305,12 @@ export default function AdminShell({
           desktopSidebarCollapsed ? "lg:ml-24" : "lg:ml-72"
         }`}
       >
-        <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur">
+        <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur dark:border-white/10 dark:bg-slate-950/90">
           <div className="flex flex-col gap-4 px-4 py-4 sm:px-6 md:px-8 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-start gap-3">
               <button
                 onClick={() => setMobileMenuOpen(true)}
-                className="mt-1 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm lg:hidden"
+                className="mt-1 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-white lg:hidden"
                 aria-label="Open navigation"
               >
                 <Menu size={20} />
@@ -297,7 +318,7 @@ export default function AdminShell({
 
               <button
                 onClick={() => setDesktopSidebarCollapsed((value) => !value)}
-                className="mt-1 hidden h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50 lg:inline-flex"
+                className="mt-1 hidden h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10 lg:inline-flex"
                 aria-label={
                   desktopSidebarCollapsed
                     ? "Show sidebar"
@@ -332,7 +353,15 @@ export default function AdminShell({
             <div className="flex flex-wrap items-center gap-3">
               {actions}
 
-              <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
+              <button
+                onClick={toggleTheme}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
+                aria-label="Toggle theme"
+              >
+                {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+              </button>
+
+              <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm dark:border-white/10 dark:bg-white/5">
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
                   {initials}
                 </div>
@@ -353,7 +382,7 @@ export default function AdminShell({
 
         <div className="p-4 sm:p-6 md:p-8">{children}</div>
 
-        <footer className="mt-8 border-t border-slate-200 bg-white px-4 py-4 sm:px-6 md:px-8">
+        <footer className="mt-8 border-t border-slate-200 bg-white px-4 py-4 dark:border-white/10 dark:bg-slate-950 sm:px-6 md:px-8">
           <div className="flex flex-col gap-2 text-sm text-slate-500 md:flex-row md:items-center md:justify-between">
             <p>© 2026 The House Hub. All rights reserved.</p>
             <p>Built for Smart Property Management.</p>

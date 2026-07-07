@@ -44,7 +44,8 @@ type SuperOwnerShellProps = {
   children: ReactNode;
 };
 
-const THEME_KEY = "thehousehub.superOwnerTheme";
+const THEME_KEY = "thehousehub.theme";
+const LEGACY_THEME_KEY = "thehousehub.superOwnerTheme";
 const SIDEBAR_COLLAPSED_KEY = "thehousehub.superOwnerSidebarCollapsed";
 
 const menuItems: Array<{
@@ -103,7 +104,8 @@ export default function SuperOwnerShell({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">(() => {
     if (typeof window === "undefined") return "dark";
-    const savedTheme = localStorage.getItem(THEME_KEY);
+    const savedTheme =
+      localStorage.getItem(THEME_KEY) || localStorage.getItem(LEGACY_THEME_KEY);
     return savedTheme === "light" || savedTheme === "dark" ? savedTheme : "dark";
   });
   const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(() => {
@@ -115,10 +117,15 @@ export default function SuperOwnerShell({
     localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(desktopSidebarCollapsed));
   }, [desktopSidebarCollapsed]);
 
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", theme === "dark");
+    localStorage.setItem(THEME_KEY, theme);
+    localStorage.setItem(LEGACY_THEME_KEY, theme);
+  }, [theme]);
+
   function toggleTheme() {
     setTheme((current) => {
       const next = current === "dark" ? "light" : "dark";
-      localStorage.setItem(THEME_KEY, next);
       return next;
     });
   }
