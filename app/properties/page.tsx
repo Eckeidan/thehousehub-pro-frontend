@@ -17,9 +17,6 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
-  ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
   ShieldCheck,
   Check,
   Home,
@@ -28,6 +25,12 @@ import {
   Camera,
   ClipboardCheck,
   Upload,
+  Building2,
+  Eye,
+  BedDouble,
+  Bath,
+  Ruler,
+  Layers,
   type LucideIcon,
 } from "lucide-react";
 import AdminShell from "@/components/AdminShell";
@@ -266,6 +269,37 @@ function generatePropertyCode(
     existingNumbers.length > 0 ? Math.max(...existingNumbers) + 1 : 1;
 
   return `${baseCode}-${String(nextNumber).padStart(3, "0")}`;
+}
+
+function formatCurrency(value?: number | null) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) {
+    return "Not set";
+  }
+
+  return `$${Number(value).toLocaleString()}`;
+}
+
+function formatPropertyType(type?: string | null) {
+  return String(type || "PROPERTY")
+    .toLowerCase()
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function formatPropertyAddress(property: Property) {
+  return [property.addressLine1, property.city, property.state, property.postalCode]
+    .filter(Boolean)
+    .join(", ");
+}
+
+function getPropertyInitials(property: Property) {
+  const source = property.name || property.code || "Property";
+  return source
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
 }
 
 export default function PropertiesPage() {
@@ -860,28 +894,6 @@ export default function PropertiesPage() {
     return filteredAndSortedProperties.slice(start, start + pageSize);
   }, [filteredAndSortedProperties, currentPage]);
 
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
-      return;
-    }
-
-    setSortField(field);
-    setSortDirection("asc");
-  };
-
-  const renderSortIcon = (field: SortField) => {
-    if (sortField !== field) {
-      return <ArrowUpDown size={14} className="ml-1 inline" />;
-    }
-
-    if (sortDirection === "asc") {
-      return <ArrowUp size={14} className="ml-1 inline" />;
-    }
-
-    return <ArrowDown size={14} className="ml-1 inline" />;
-  };
-
   const handleRowClick = (propertyId: string) => {
     router.push(`/properties/${propertyId}`);
   };
@@ -995,175 +1007,211 @@ export default function PropertiesPage() {
           </select>
         </div>
 
+        <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-3">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-xs font-semibold uppercase text-slate-500">
+              Active properties
+            </p>
+            <p className="mt-2 text-2xl font-bold text-slate-950">
+              {filteredAndSortedProperties.filter((property) => property.isActive).length}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-xs font-semibold uppercase text-slate-500">
+              Monthly portfolio
+            </p>
+            <p className="mt-2 text-2xl font-bold text-slate-950">
+              {formatCurrency(
+                filteredAndSortedProperties.reduce(
+                  (total, property) => total + Number(property.monthlyRent || 0),
+                  0
+                )
+              )}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-xs font-semibold uppercase text-slate-500">
+              Cities covered
+            </p>
+            <p className="mt-2 text-2xl font-bold text-slate-950">
+              {
+                new Set(
+                  filteredAndSortedProperties
+                    .map((property) => property.city)
+                    .filter(Boolean)
+                ).size
+              }
+            </p>
+          </div>
+        </div>
+
+        <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 lg:flex-row lg:items-center lg:justify-between">
+          <p className="px-2 text-sm font-medium text-slate-600">
+            Showing {startItem} to {endItem} of {filteredAndSortedProperties.length} properties
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <select
+              value={sortField}
+              onChange={(e) => setSortField(e.target.value as SortField)}
+              className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-blue-500"
+            >
+              <option value="name">Sort by name</option>
+              <option value="code">Sort by code</option>
+              <option value="city">Sort by city</option>
+              <option value="propertyType">Sort by type</option>
+              <option value="monthlyRent">Sort by rent</option>
+            </select>
+            <button
+              type="button"
+              onClick={() =>
+                setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"))
+              }
+              className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+            >
+              {sortDirection === "asc" ? "Ascending" : "Descending"}
+            </button>
+          </div>
+        </div>
+
         {error ? (
           <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-red-600">
             {error}
           </div>
         ) : loading ? (
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-8 text-center text-slate-500">
-            Loading properties...
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div
+                key={index}
+                className="h-80 animate-pulse rounded-3xl border border-slate-200 bg-slate-100"
+              />
+            ))}
           </div>
         ) : filteredAndSortedProperties.length === 0 ? (
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-8 text-center text-slate-500">
-            No properties found.
+          <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
+            <Building2 className="mx-auto mb-3 h-10 w-10 text-slate-400" />
+            <p className="text-lg font-semibold text-slate-900">
+              No properties found
+            </p>
+            <p className="mt-1 text-sm text-slate-500">
+              Adjust your filters or add your first property.
+            </p>
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="min-w-[1200px] border-separate border-spacing-y-3">
-                <thead>
-                  <tr className="text-left text-sm text-slate-500">
-                    <th className="px-4 py-2">
-                      <button
-                        type="button"
-                        onClick={() => handleSort("code")}
-                        className="font-medium hover:text-slate-900"
-                      >
-                        Code {renderSortIcon("code")}
-                      </button>
-                    </th>
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 2xl:grid-cols-3">
+              {paginatedProperties.map((property) => {
+                const occupancy = property.occupancyStatus || "AVAILABLE";
+                const address = formatPropertyAddress(property);
 
-                    <th className="px-4 py-2">Org ID</th>
-
-                    <th className="px-4 py-2">
-                      <button
-                        type="button"
-                        onClick={() => handleSort("name")}
-                        className="font-medium hover:text-slate-900"
-                      >
-                        Property Name {renderSortIcon("name")}
-                      </button>
-                    </th>
-
-                    <th className="px-4 py-2">
-                      <button
-                        type="button"
-                        onClick={() => handleSort("addressLine1")}
-                        className="font-medium hover:text-slate-900"
-                      >
-                        Address {renderSortIcon("addressLine1")}
-                      </button>
-                    </th>
-
-                    <th className="px-4 py-2">City</th>
-
-                    <th className="px-4 py-2">
-                      <button
-                        type="button"
-                        onClick={() => handleSort("state")}
-                        className="font-medium hover:text-slate-900"
-                      >
-                        State {renderSortIcon("state")}
-                      </button>
-                    </th>
-
-                    <th className="px-4 py-2">
-                      <button
-                        type="button"
-                        onClick={() => handleSort("country")}
-                        className="font-medium hover:text-slate-900"
-                      >
-                        Country {renderSortIcon("country")}
-                      </button>
-                    </th>
-
-                    <th className="px-4 py-2">ZIP</th>
-
-                    <th className="px-4 py-2">
-                      <button
-                        type="button"
-                        onClick={() => handleSort("propertyType")}
-                        className="font-medium hover:text-slate-900"
-                      >
-                        Type {renderSortIcon("propertyType")}
-                      </button>
-                    </th>
-
-                    <th className="px-4 py-2">
-                      <button
-                        type="button"
-                        onClick={() => handleSort("monthlyRent")}
-                        className="font-medium hover:text-slate-900"
-                      >
-                        Rent {renderSortIcon("monthlyRent")}
-                      </button>
-                    </th>
-
-                    <th className="px-4 py-2">Status</th>
-                    <th className="px-4 py-2">Actions</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {paginatedProperties.map((property) => (
-                    <tr
-                      key={property.id}
+                return (
+                  <article
+                    key={property.id}
+                    className="group overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-xl"
+                  >
+                    <button
+                      type="button"
                       onClick={() => handleRowClick(property.id)}
-                      className="cursor-pointer rounded-2xl bg-slate-50 shadow-sm transition hover:bg-slate-100"
+                      className="block w-full text-left"
                     >
-                      <td className="rounded-l-2xl px-4 py-4 font-medium text-slate-700">
-                        {property.code}
-                      </td>
+                      <div className="relative min-h-40 overflow-hidden bg-slate-950 p-5 text-white">
+                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.45),_transparent_34%),linear-gradient(135deg,_#0f172a,_#064e3b)]" />
+                        <div className="absolute -right-10 -top-10 h-36 w-36 rounded-full border border-white/20" />
+                        <div className="absolute bottom-4 right-5 text-6xl font-black text-white/10">
+                          {getPropertyInitials(property)}
+                        </div>
 
-                      <td className="px-4 py-4 text-xs font-mono text-emerald-600">
-                        {property.organizationId || "-"}
-                      </td>
+                        <div className="relative flex items-start justify-between gap-4">
+                          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 backdrop-blur">
+                            <Building2 className="h-6 w-6" />
+                          </div>
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-bold ${
+                              property.isActive
+                                ? "bg-emerald-400/20 text-emerald-100 ring-1 ring-emerald-300/40"
+                                : "bg-white/15 text-white/80 ring-1 ring-white/20"
+                            }`}
+                          >
+                            {property.isActive ? "Active" : "Inactive"}
+                          </span>
+                        </div>
 
-                      <td className="px-4 py-4 font-semibold text-slate-900">
-                        {property.name || "-"}
-                      </td>
+                        <div className="relative mt-8">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-white/60">
+                            {property.code || "No code"}
+                          </p>
+                          <h4 className="mt-2 line-clamp-2 text-2xl font-bold">
+                            {property.name || "Untitled property"}
+                          </h4>
+                        </div>
+                      </div>
+                    </button>
 
-                      <td className="px-4 py-4 text-slate-600">
-                        {property.addressLine1}
-                      </td>
-
-                      <td className="px-4 py-4 text-slate-600">
-                        {property.city || "-"}
-                      </td>
-
-                      <td className="px-4 py-4 text-slate-600">
-                        {property.state || "-"}
-                      </td>
-
-                      <td className="px-4 py-4 text-slate-600">
-                        {property.country || "-"}
-                      </td>
-
-                      <td className="px-4 py-4 text-slate-600">
-                        {property.postalCode || "-"}
-                      </td>
-
-                      <td className="px-4 py-4 text-slate-600">
-                        {property.propertyType}
-                      </td>
-
-                      <td className="px-4 py-4 text-slate-600">
-                        {property.monthlyRent != null
-                          ? `$${Number(property.monthlyRent).toLocaleString()}`
-                          : "-"}
-                      </td>
-
-                      <td className="px-4 py-4">
-                        <span
-                          className={`rounded-full px-3 py-1 text-xs font-medium ${
-                            property.isActive
-                              ? "bg-emerald-100 text-emerald-700"
-                              : "bg-slate-200 text-slate-700"
-                          }`}
-                        >
-                          {property.isActive ? "Active" : "Inactive"}
+                    <div className="p-5">
+                      <div className="mb-4 flex items-start gap-2 text-sm text-slate-600">
+                        <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
+                        <span className="line-clamp-2">
+                          {address || "Address not configured"}
                         </span>
-                      </td>
+                      </div>
 
-                      <td className="rounded-r-2xl px-4 py-4">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                          <p className="text-xs font-semibold uppercase text-slate-400">
+                            Rent
+                          </p>
+                          <p className="mt-1 font-bold text-slate-950">
+                            {formatCurrency(property.monthlyRent)}
+                          </p>
+                        </div>
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                          <p className="text-xs font-semibold uppercase text-slate-400">
+                            Type
+                          </p>
+                          <p className="mt-1 font-bold text-slate-950">
+                            {formatPropertyType(property.propertyType)}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-4 gap-2 text-xs font-semibold text-slate-600">
+                        <div className="flex items-center gap-1 rounded-xl bg-slate-100 px-2 py-2">
+                          <BedDouble className="h-3.5 w-3.5 text-slate-400" />
+                          {property.bedrooms ?? "-"}
+                        </div>
+                        <div className="flex items-center gap-1 rounded-xl bg-slate-100 px-2 py-2">
+                          <Bath className="h-3.5 w-3.5 text-slate-400" />
+                          {property.bathrooms ?? "-"}
+                        </div>
+                        <div className="flex items-center gap-1 rounded-xl bg-slate-100 px-2 py-2">
+                          <Ruler className="h-3.5 w-3.5 text-slate-400" />
+                          {property.areaSqm ? `${property.areaSqm}` : "-"}
+                        </div>
+                        <div className="flex items-center gap-1 rounded-xl bg-slate-100 px-2 py-2">
+                          <Layers className="h-3.5 w-3.5 text-slate-400" />
+                          {property.floor ?? "-"}
+                        </div>
+                      </div>
+
+                      <div className="mt-5 flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                        <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
+                          {formatPropertyType(occupancy)}
+                        </span>
+
                         <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleRowClick(property.id)}
+                            className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-xs font-bold text-white hover:bg-blue-700"
+                          >
+                            <Eye className="h-4 w-4" />
+                            View
+                          </button>
+
                           {canEdit ? (
                             <>
                               <button
                                 type="button"
-                                onClick={(
-                                  e: MouseEvent<HTMLButtonElement>
-                                ) => {
+                                onClick={(e: MouseEvent<HTMLButtonElement>) => {
                                   e.stopPropagation();
                                   openEditModal(property);
                                 }}
@@ -1175,9 +1223,7 @@ export default function PropertiesPage() {
 
                               <button
                                 type="button"
-                                onClick={(
-                                  e: MouseEvent<HTMLButtonElement>
-                                ) => {
+                                onClick={(e: MouseEvent<HTMLButtonElement>) => {
                                   e.stopPropagation();
                                   setDeleteId(property.id);
                                 }}
@@ -1187,17 +1233,13 @@ export default function PropertiesPage() {
                                 <Trash2 size={16} />
                               </button>
                             </>
-                          ) : (
-                            <span className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-500">
-                              Read only
-                            </span>
-                          )}
+                          ) : null}
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
 
             <div className="mt-6 flex flex-col gap-4 border-t border-slate-200 pt-4 md:flex-row md:items-center md:justify-between">
