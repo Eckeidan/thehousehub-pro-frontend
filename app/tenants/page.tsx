@@ -491,7 +491,7 @@ export default function TenantsPage() {
               {Array.from({ length: 6 }).map((_, index) => (
                 <div
                   key={index}
-                  className="h-80 animate-pulse rounded-3xl border border-slate-200 bg-slate-100"
+                  className="h-56 animate-pulse rounded-3xl border border-slate-200 bg-slate-100"
                 />
               ))}
             </div>
@@ -519,17 +519,17 @@ export default function TenantsPage() {
                 return (
                   <article
                     key={tenant.id}
-                    className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-xl"
+                    className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-lg"
                   >
-                    <div className="relative min-h-40 bg-slate-950 p-5 text-white">
+                    <div className="relative bg-slate-950 p-4 text-white">
                       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(37,99,235,0.48),_transparent_35%),linear-gradient(135deg,_#111827,_#172554_55%,_#064e3b)]" />
-                      <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full border border-white/15" />
-                      <div className="absolute bottom-3 right-5 text-6xl font-black text-white/10">
+                      <div className="absolute -right-8 -top-10 h-28 w-28 rounded-full border border-white/15" />
+                      <div className="absolute bottom-2 right-4 text-5xl font-black text-white/10">
                         {getInitials(tenant.firstName, tenant.lastName)}
                       </div>
 
-                      <div className="relative flex items-start justify-between gap-4">
-                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 text-lg font-black backdrop-blur">
+                      <div className="relative flex items-center justify-between gap-4">
+                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15 text-sm font-black backdrop-blur">
                           {getInitials(tenant.firstName, tenant.lastName) || "T"}
                         </div>
                         <span
@@ -545,53 +545,53 @@ export default function TenantsPage() {
                         </span>
                       </div>
 
-                      <div className="relative mt-8">
+                      <div className="relative mt-4">
                         <p className="text-xs font-semibold uppercase tracking-wide text-white/60">
                           Tenant ID #{tenant.id}
                         </p>
-                        <h3 className="mt-2 line-clamp-2 text-2xl font-bold">
+                        <h3 className="mt-1 line-clamp-1 text-xl font-bold">
                           {tenantName}
                         </h3>
                       </div>
                     </div>
 
-                    <div className="p-5">
-                      <div className="grid grid-cols-1 gap-3">
+                    <div className="p-4">
+                      <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
                         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                          <p className="mb-2 text-xs font-semibold uppercase text-slate-400">
+                          <p className="mb-1 text-[11px] font-semibold uppercase text-slate-400">
                             Contact
                           </p>
-                          <p className="flex items-center gap-2 truncate text-sm font-medium text-slate-800">
-                            <Phone className="h-4 w-4 shrink-0 text-slate-400" />
+                          <p className="flex items-center gap-2 truncate text-sm font-semibold text-slate-800">
+                            <Phone className="h-3.5 w-3.5 shrink-0 text-slate-400" />
                             {tenant.phone || "No phone"}
                           </p>
-                          <p className="mt-1 flex items-center gap-2 truncate text-sm text-slate-600">
-                            <Mail className="h-4 w-4 shrink-0 text-slate-400" />
+                          <p className="mt-1 flex items-center gap-2 truncate text-xs text-slate-600">
+                            <Mail className="h-3.5 w-3.5 shrink-0 text-slate-400" />
                             {tenant.email || "No email"}
                           </p>
                         </div>
 
                         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                          <p className="mb-2 text-xs font-semibold uppercase text-slate-400">
+                          <p className="mb-1 text-[11px] font-semibold uppercase text-slate-400">
                             Property assignment
                           </p>
                           <p className="flex items-center gap-2 truncate text-sm font-bold text-slate-900">
-                            <MapPin className="h-4 w-4 shrink-0 text-blue-500" />
+                            <MapPin className="h-3.5 w-3.5 shrink-0 text-blue-500" />
                             {propertyName}
                           </p>
-                          <p className="mt-1 truncate font-mono text-[11px] text-emerald-600">
+                          <p className="mt-1 truncate font-mono text-[10px] text-emerald-600">
                             Org: {tenant.organizationId || "-"}
                           </p>
                         </div>
                       </div>
 
-                      <div className="mt-4 grid grid-cols-2 gap-3">
+                      <div className="mt-3 grid grid-cols-2 gap-3">
                         <div className="rounded-2xl border border-slate-200 bg-white p-3">
-                          <p className="text-xs font-semibold uppercase text-slate-400">
+                          <p className="text-[11px] font-semibold uppercase text-slate-400">
                             Lease
                           </p>
                           <span
-                            className={`mt-2 inline-flex rounded-full px-3 py-1 text-xs font-bold ${leaseBadge(
+                            className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ${leaseBadge(
                               tenant.leaseStatus
                             )}`}
                           >
@@ -599,32 +599,32 @@ export default function TenantsPage() {
                           </span>
                         </div>
                         <div className="rounded-2xl border border-slate-200 bg-white p-3">
-                          <p className="text-xs font-semibold uppercase text-slate-400">
+                          <p className="text-[11px] font-semibold uppercase text-slate-400">
                             Occupancy
                           </p>
-                          <p className="mt-2 text-lg font-black text-slate-950">
+                          <p className="mt-1 text-base font-black text-slate-950">
                             {occupancyDays ? `${occupancyDays} days` : "Not set"}
                           </p>
                         </div>
                       </div>
 
-                      <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                        <p className="flex items-center gap-2 text-xs font-semibold uppercase text-slate-400">
-                          <CalendarDays className="h-4 w-4" />
+                      <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                        <p className="flex items-center gap-2 text-[11px] font-semibold uppercase text-slate-400">
+                          <CalendarDays className="h-3.5 w-3.5" />
                           Occupancy period
                         </p>
-                        <p className="mt-2 text-sm font-semibold text-slate-800">
+                        <p className="mt-1 text-sm font-semibold text-slate-800">
                           {getOccupancyPeriod(tenant)}
                         </p>
                         {tenant.leaseStatus === "ACTIVE" && (
-                          <p className="mt-1 text-xs font-medium text-emerald-600">
+                          <p className="mt-0.5 text-xs font-medium text-emerald-600">
                             Current occupancy
                           </p>
                         )}
                       </div>
 
-                      <div className="mt-5 flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
-                        <span className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
+                      <div className="mt-4 flex flex-col gap-3 border-t border-slate-200 pt-3 sm:flex-row sm:items-center sm:justify-between">
+                        <span className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700">
                           <KeyRound className="h-3.5 w-3.5" />
                           Tenant profile
                         </span>
@@ -632,7 +632,7 @@ export default function TenantsPage() {
                         <div className="flex items-center gap-2">
                           <Link
                             href={`/tenants/${tenant.id}`}
-                            className="inline-flex items-center gap-1 rounded-xl bg-slate-950 px-3 py-2 text-xs font-bold text-white transition hover:bg-blue-700"
+                            className="inline-flex items-center gap-1 rounded-xl bg-slate-950 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-blue-700"
                           >
                             <Eye className="h-3.5 w-3.5" />
                             View
@@ -642,7 +642,7 @@ export default function TenantsPage() {
                             <>
                               <Link
                                 href={`/tenants/edit/${tenant.id}`}
-                                className="inline-flex items-center gap-1 rounded-xl border border-blue-200 px-3 py-2 text-xs font-bold text-blue-700 transition hover:bg-blue-50"
+                                className="inline-flex items-center gap-1 rounded-xl border border-blue-200 px-3 py-1.5 text-xs font-bold text-blue-700 transition hover:bg-blue-50"
                               >
                                 <Pencil className="h-3.5 w-3.5" />
                                 Edit
@@ -651,7 +651,7 @@ export default function TenantsPage() {
                               <button
                                 type="button"
                                 onClick={() => openDeleteModal(tenant)}
-                                className="rounded-xl border border-rose-200 p-2 text-rose-700 transition hover:bg-rose-50"
+                                className="rounded-xl border border-rose-200 p-1.5 text-rose-700 transition hover:bg-rose-50"
                                 title="Delete tenant"
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
