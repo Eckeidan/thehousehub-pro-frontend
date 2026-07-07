@@ -279,24 +279,48 @@ export default function AdminShell({
           </p>
 
           <div className="space-y-2">
-            {menuItems.map((item) => (
-              <Link
-                key={item.key}
-                href={item.href}
-                onClick={() => setMobileMenuOpen(false)}
-                className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-medium transition ${
-                  activeItem === item.key
-                    ? "bg-white/15 text-white shadow"
-                    : "text-blue-100/80 hover:bg-white/10 hover:text-white"
-                } ${desktopSidebarCollapsed ? "lg:justify-center lg:px-3" : ""}`}
-                title={desktopSidebarCollapsed ? item.label : undefined}
-              >
-                <span className="shrink-0">{item.icon}</span>
-                <span className={desktopSidebarCollapsed ? "lg:hidden" : ""}>
-                  {item.label}
-                </span>
-              </Link>
-            ))}
+            {menuItems.map((item) => {
+              const itemBadgeCount = item.key === "todo" ? todoCount : 0;
+              const itemTitle =
+                itemBadgeCount > 0
+                  ? `${item.label} (${itemBadgeCount > 99 ? "99+" : itemBadgeCount})`
+                  : item.label;
+
+              return (
+                <Link
+                  key={item.key}
+                  href={item.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-medium transition ${
+                    activeItem === item.key
+                      ? "bg-white/15 text-white shadow"
+                      : "text-blue-100/80 hover:bg-white/10 hover:text-white"
+                  } ${
+                    desktopSidebarCollapsed ? "lg:justify-center lg:px-3" : ""
+                  }`}
+                  title={desktopSidebarCollapsed ? itemTitle : undefined}
+                >
+                  <span className="shrink-0">{item.icon}</span>
+                  <span
+                    className={`min-w-0 flex-1 ${
+                      desktopSidebarCollapsed ? "lg:hidden" : ""
+                    }`}
+                  >
+                    {item.label}
+                  </span>
+                  {itemBadgeCount > 0 && (
+                    <span
+                      className={`ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-black leading-none text-white shadow-sm ring-1 ring-white/25 ${
+                        desktopSidebarCollapsed ? "lg:hidden" : ""
+                      }`}
+                      aria-label={`${itemBadgeCount} pending approvals`}
+                    >
+                      {itemBadgeCount > 99 ? "99+" : itemBadgeCount}
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
           </div>
         </nav>
 
