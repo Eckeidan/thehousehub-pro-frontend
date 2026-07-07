@@ -1,26 +1,20 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft,
   Building2,
   Home,
   Loader2,
-  Moon,
   Search,
   ShieldCheck,
-  Sun,
   Users,
   Wallet,
   Wrench,
 } from "lucide-react";
+import SuperOwnerShell from "@/components/SuperOwnerShell";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-const THEME_KEY = "thehousehub.superOwnerTheme";
-
-type ThemeMode = "light" | "dark";
 
 type StoredUser = {
   fullName?: string;
@@ -118,35 +112,6 @@ type PermissionsResponse = {
   permissions: string[];
 };
 
-const themeClass = {
-  light: {
-    page: "bg-slate-100 text-slate-950",
-    header: "border-slate-200 bg-white/95",
-    card: "border-slate-200 bg-white shadow-sm",
-    softCard: "border-slate-200 bg-slate-50",
-    subtle: "text-slate-500",
-    muted: "text-slate-600",
-    title: "text-slate-950",
-    input: "border-slate-200 bg-white text-slate-950 placeholder:text-slate-400 focus:border-blue-500",
-    button: "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
-    active: "border-blue-200 bg-blue-50 text-blue-800",
-    divider: "border-slate-200",
-  },
-  dark: {
-    page: "bg-slate-950 text-slate-100",
-    header: "border-white/10 bg-slate-950/95",
-    card: "border-white/10 bg-white/[0.04] shadow-2xl shadow-black/20",
-    softCard: "border-white/10 bg-slate-900/80",
-    subtle: "text-slate-500",
-    muted: "text-slate-400",
-    title: "text-white",
-    input: "border-white/10 bg-slate-900 text-white placeholder:text-slate-500 focus:border-blue-400",
-    button: "border-white/10 bg-white/5 text-slate-100 hover:bg-white/10",
-    active: "border-blue-400/20 bg-blue-400/10 text-blue-100",
-    divider: "border-white/10",
-  },
-};
-
 function formatCurrency(value: number | string | null | undefined) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -192,24 +157,23 @@ function propertyAddress(property: PropertyRecord) {
 
 export default function SuperOwnerOrganizationsPage() {
   const router = useRouter();
-  const [theme, setTheme] = useState<ThemeMode>("dark");
   const [user, setUser] = useState<StoredUser | null>(null);
   const [permissions, setPermissions] = useState<PermissionsResponse | null>(null);
   const [organizations, setOrganizations] = useState<OrganizationSummary[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [detail, setDetail] = useState<OrganizationDetail | null>(null);
   const [query, setQuery] = useState("");
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const t = themeClass[theme];
   const canReadOrganizations =
-    permissions?.accessAll || permissions?.permissions?.includes("organizations:read");
+    permissions?.accessAll ||
+    permissions?.permissions?.includes("organizations:read") ||
+    permissions?.permissions?.includes("*");
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem(THEME_KEY);
-    if (savedTheme === "light" || savedTheme === "dark") setTheme(savedTheme);
     const organizationId = new URLSearchParams(window.location.search).get("organizationId");
     if (organizationId) setSelectedId(organizationId);
 
@@ -228,6 +192,7 @@ export default function SuperOwnerOrganizationsPage() {
         return;
       }
       setUser(parsedUser);
+      setCheckingAuth(false);
     } catch {
       router.replace("/");
     }
@@ -243,6 +208,8 @@ export default function SuperOwnerOrganizationsPage() {
     });
 
     if (res.status === 401) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
       router.replace("/");
       throw new Error("Unauthorized");
     }
@@ -262,18 +229,18 @@ export default function SuperOwnerOrganizationsPage() {
       const rows = await apiFetch<OrganizationSummary[]>("/api/super-owner/organizations");
       setOrganizations(rows);
 
-      const nextId = selectedId || rows[0]?.id || "";
-      setSelectedId(nextId);
+      setSelectedId((current) => current || rows[0]?.id || "");
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Unable to load organizations.");
     } finally {
       setLoading(false);
     }
-  }, [apiFetch, selectedId]);
+  }, [apiFetch]);
 
   useEffect(() => {
+    if (checkingAuth) return;
     loadOrganizations();
-  }, [loadOrganizations]);
+  }, [checkingAuth, loadOrganizations]);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -299,14 +266,6 @@ export default function SuperOwnerOrganizationsPage() {
     loadDetail();
   }, [apiFetch, selectedId]);
 
-  function toggleTheme() {
-    setTheme((current) => {
-      const next = current === "dark" ? "light" : "dark";
-      localStorage.setItem(THEME_KEY, next);
-      return next;
-    });
-  }
-
   const filteredOrganizations = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     if (!normalized) return organizations;
@@ -319,9 +278,9 @@ export default function SuperOwnerOrganizationsPage() {
     );
   }, [organizations, query]);
 
-  if (loading) {
+  if (checkingAuth || loading) {
     return (
-      <main className={`flex min-h-screen items-center justify-center ${t.page}`}>
+      <main className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-100">
         <Loader2 className="mr-3 h-5 w-5 animate-spin" />
         Loading organizations...
       </main>
@@ -331,72 +290,46 @@ export default function SuperOwnerOrganizationsPage() {
   const counts = getCounts(detail);
 
   return (
-    <main className={`min-h-screen ${t.page}`}>
-      <header className={`border-b px-5 py-5 backdrop-blur md:px-8 ${t.header}`}>
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <Link
-              href="/super-owner"
-              className={`inline-flex items-center gap-2 text-sm font-semibold ${t.muted}`}
-            >
-              <ArrowLeft size={16} />
-              Back to Command Center
-            </Link>
-            <h1 className={`mt-3 text-3xl font-bold tracking-tight ${t.title}`}>
-              Organizations
-            </h1>
-            <p className={`mt-2 max-w-2xl text-sm leading-6 ${t.muted}`}>
-              Inspect every landlord organization, its users, properties, tenants, payments, and operational status.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <div className={`rounded-2xl border px-4 py-3 text-sm ${t.card}`}>
-              <p className={`font-semibold ${t.title}`}>{user?.fullName || "Super Owner"}</p>
-              <p className={`text-xs ${t.muted}`}>{user?.email}</p>
-            </div>
-            <button
-              onClick={toggleTheme}
-              className={`inline-flex h-12 w-12 items-center justify-center rounded-2xl border transition ${t.button}`}
-              aria-label="Toggle theme"
-            >
-              {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
-            </button>
-          </div>
+    <SuperOwnerShell
+      user={user}
+      activeItem="organizations"
+      title="Organizations"
+      subtitle="Inspecter chaque organisation landlord, ses propriétés, tenants, paiements et opérations."
+      actions={
+        <div className="relative w-full sm:w-80">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search organization..."
+            className="w-full rounded-2xl border border-slate-200 bg-white px-10 py-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-blue-500 dark:border-white/10 dark:bg-white/5 dark:text-white dark:placeholder:text-slate-500"
+          />
         </div>
-      </header>
-
-      <div className="mx-auto grid max-w-7xl gap-6 px-5 py-6 md:px-8 xl:grid-cols-[0.34fr_0.66fr]">
+      }
+    >
+      <div className="grid gap-6 xl:grid-cols-[0.34fr_0.66fr]">
         {error && (
-          <div className="rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-700 xl:col-span-2">
+          <div className="rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-100 xl:col-span-2">
             {error}
           </div>
         )}
 
-        <aside className={`rounded-3xl border p-5 ${t.card}`}>
+        <aside className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:shadow-2xl dark:shadow-black/20">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className={`text-lg font-bold ${t.title}`}>Directory</h2>
-              <p className={`mt-1 text-sm ${t.muted}`}>{organizations.length} organizations</p>
+              <h2 className="text-lg font-black text-slate-950 dark:text-white">Directory</h2>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                {organizations.length} organizations
+              </p>
             </div>
             <ShieldCheck className="h-5 w-5 text-emerald-500" />
           </div>
 
-          <div className="relative mt-5">
-            <Search className={`pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 ${t.subtle}`} />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search organization..."
-              className={`w-full rounded-2xl border px-10 py-3 text-sm outline-none transition ${t.input}`}
-            />
-          </div>
-
           <div className="mt-5 space-y-3">
             {!canReadOrganizations ? (
-              <EmptyState theme={theme} title="No access" text="Grant organizations:read to inspect organizations." />
+              <EmptyState title="No access" text="Grant organizations:read to inspect organizations." />
             ) : filteredOrganizations.length === 0 ? (
-              <EmptyState theme={theme} title="No organizations" text="No organization matches your search." />
+              <EmptyState title="No organizations" text="No organization matches your search." />
             ) : (
               filteredOrganizations.map((organization) => {
                 const active = organization.id === selectedId;
@@ -407,15 +340,17 @@ export default function SuperOwnerOrganizationsPage() {
                     key={organization.id}
                     onClick={() => setSelectedId(organization.id)}
                     className={`w-full rounded-2xl border p-4 text-left transition ${
-                      active ? t.active : t.softCard
+                      active
+                        ? "border-blue-300 bg-blue-50 text-blue-900 dark:border-blue-400/30 dark:bg-blue-400/10 dark:text-blue-100"
+                        : "border-slate-200 bg-slate-50 text-slate-700 hover:border-blue-200 hover:bg-blue-50/50 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300 dark:hover:border-blue-400/30 dark:hover:bg-blue-400/10"
                     }`}
                   >
-                    <p className={`font-semibold ${active ? "" : t.title}`}>{organization.name}</p>
-                    <p className={`mt-1 text-xs ${active ? "" : t.muted}`}>{organization.email}</p>
+                    <p className="font-black">{organization.name}</p>
+                    <p className="mt-1 text-xs opacity-75">{organization.email}</p>
                     <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
-                      <MiniStat theme={theme} label="Properties" value={rowCounts.properties} />
-                      <MiniStat theme={theme} label="Tenants" value={rowCounts.tenants} />
-                      <MiniStat theme={theme} label="Users" value={rowCounts.users} />
+                      <MiniStat label="Properties" value={rowCounts.properties} />
+                      <MiniStat label="Tenants" value={rowCounts.tenants} />
+                      <MiniStat label="Users" value={rowCounts.users} />
                     </div>
                   </button>
                 );
@@ -426,63 +361,63 @@ export default function SuperOwnerOrganizationsPage() {
 
         <section className="space-y-6">
           {detailLoading || !detail ? (
-            <div className={`flex min-h-[420px] items-center justify-center rounded-3xl border ${t.card}`}>
+            <div className="flex min-h-[420px] items-center justify-center rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-white/[0.04]">
               <Loader2 className="mr-3 h-5 w-5 animate-spin" />
               Loading organization detail...
             </div>
           ) : (
             <>
-              <section className={`rounded-3xl border p-6 ${t.card}`}>
+              <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:shadow-2xl dark:shadow-black/20">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div>
-                    <p className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${t.active}`}>
+                    <p className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-800 dark:border-blue-400/20 dark:bg-blue-400/10 dark:text-blue-100">
                       <Building2 size={14} />
                       Organization
                     </p>
-                    <h2 className={`mt-4 text-3xl font-bold tracking-tight ${t.title}`}>
+                    <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-950 dark:text-white">
                       {detail.name}
                     </h2>
-                    <p className={`mt-2 text-sm ${t.muted}`}>{detail.email}</p>
-                    <p className={`mt-1 text-sm ${t.muted}`}>
+                    <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{detail.email}</p>
+                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                       {detail.companyName || "No company name"} · {detail.phone || "No phone"}
                     </p>
                   </div>
-                  <p className={`text-sm ${t.subtle}`}>
+                  <p className="text-sm text-slate-400 dark:text-slate-500">
                     Created {formatDate(detail.createdAt)}
                   </p>
                 </div>
 
                 <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-                  <Metric theme={theme} icon={<Home size={16} />} label="Properties" value={counts.properties} />
-                  <Metric theme={theme} icon={<Users size={16} />} label="Tenants" value={counts.tenants} />
-                  <Metric theme={theme} icon={<ShieldCheck size={16} />} label="Users" value={counts.users} />
-                  <Metric theme={theme} icon={<Wallet size={16} />} label="Payments" value={counts.payments} />
-                  <Metric theme={theme} icon={<Wrench size={16} />} label="Maintenance" value={counts.maintenanceRequests} />
+                  <Metric icon={<Home size={16} />} label="Properties" value={counts.properties} />
+                  <Metric icon={<Users size={16} />} label="Tenants" value={counts.tenants} />
+                  <Metric icon={<ShieldCheck size={16} />} label="Users" value={counts.users} />
+                  <Metric icon={<Wallet size={16} />} label="Payments" value={counts.payments} />
+                  <Metric icon={<Wrench size={16} />} label="Maintenance" value={counts.maintenanceRequests} />
                 </div>
               </section>
 
-              <section className={`rounded-3xl border p-6 ${t.card}`}>
-                <h3 className={`text-xl font-bold ${t.title}`}>Properties</h3>
+              <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:shadow-2xl dark:shadow-black/20">
+                <h3 className="text-xl font-black text-slate-950 dark:text-white">Properties</h3>
                 <div className="mt-5 grid gap-4 lg:grid-cols-2">
                   {detail.properties.length === 0 ? (
-                    <EmptyState theme={theme} title="No properties" text="This organization has not added properties yet." />
+                    <EmptyState title="No properties" text="This organization has not added properties yet." />
                   ) : (
                     detail.properties.map((property) => (
-                      <article key={property.id} className={`rounded-2xl border p-4 ${t.softCard}`}>
+                      <article key={property.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/[0.03]">
                         <div className="flex items-start justify-between gap-3">
                           <div>
-                            <p className={`font-semibold ${t.title}`}>{property.name || property.code}</p>
-                            <p className={`mt-1 text-xs ${t.subtle}`}>{property.code}</p>
+                            <p className="font-black text-slate-950 dark:text-white">{property.name || property.code}</p>
+                            <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">{property.code}</p>
                           </div>
-                          <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${t.active}`}>
+                          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-100">
                             {property.occupancyStatus || "AVAILABLE"}
                           </span>
                         </div>
-                        <p className={`mt-3 text-sm ${t.muted}`}>{propertyAddress(property)}</p>
+                        <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">{propertyAddress(property)}</p>
                         <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
-                          <MiniStat theme={theme} label="Type" value={property.propertyType || "N/A"} />
-                          <MiniStat theme={theme} label="Rent" value={formatCurrency(property.monthlyRent)} />
-                          <MiniStat theme={theme} label="Tenants" value={property.tenants?.length || 0} />
+                          <MiniStat label="Type" value={property.propertyType || "N/A"} />
+                          <MiniStat label="Rent" value={formatCurrency(property.monthlyRent)} />
+                          <MiniStat label="Tenants" value={property.tenants?.length || 0} />
                         </div>
                       </article>
                     ))
@@ -491,20 +426,19 @@ export default function SuperOwnerOrganizationsPage() {
               </section>
 
               <section className="grid gap-6 xl:grid-cols-2">
-                <Panel theme={theme} title="Users">
+                <Panel title="Users">
                   {detail.users.map((item) => (
-                    <Row key={item.id} theme={theme} title={item.fullName} subtitle={`${item.email} · ${item.role}`} meta={item.isActive ? "Active" : "Inactive"} />
+                    <Row key={item.id} title={item.fullName} subtitle={`${item.email} · ${item.role}`} meta={item.isActive ? "Active" : "Inactive"} />
                   ))}
                 </Panel>
 
-                <Panel theme={theme} title="Tenants">
+                <Panel title="Tenants">
                   {detail.tenants.length === 0 ? (
-                    <EmptyState theme={theme} title="No tenants" text="No tenant records yet." />
+                    <EmptyState title="No tenants" text="No tenant records yet." />
                   ) : (
                     detail.tenants.slice(0, 12).map((item) => (
                       <Row
                         key={item.id}
-                        theme={theme}
                         title={`${item.firstName} ${item.lastName}`}
                         subtitle={`${item.email || "No email"} · ${item.property?.name || item.property?.code || "No property"}`}
                         meta={item.status || "ACTIVE"}
@@ -513,14 +447,13 @@ export default function SuperOwnerOrganizationsPage() {
                   )}
                 </Panel>
 
-                <Panel theme={theme} title="Recent Payments">
+                <Panel title="Recent Payments">
                   {detail.payments.length === 0 ? (
-                    <EmptyState theme={theme} title="No payments" text="No payment activity yet." />
+                    <EmptyState title="No payments" text="No payment activity yet." />
                   ) : (
                     detail.payments.slice(0, 10).map((item) => (
                       <Row
                         key={item.id}
-                        theme={theme}
                         title={formatCurrency(item.amount)}
                         subtitle={`${item.lease?.tenant?.firstName || ""} ${item.lease?.tenant?.lastName || ""}`.trim() || "No tenant"}
                         meta={`${item.status} · ${formatDate(item.paymentDate)}`}
@@ -529,14 +462,13 @@ export default function SuperOwnerOrganizationsPage() {
                   )}
                 </Panel>
 
-                <Panel theme={theme} title="Maintenance">
+                <Panel title="Maintenance">
                   {detail.maintenanceRequests.length === 0 ? (
-                    <EmptyState theme={theme} title="No maintenance" text="No maintenance requests yet." />
+                    <EmptyState title="No maintenance" text="No maintenance requests yet." />
                   ) : (
                     detail.maintenanceRequests.slice(0, 10).map((item) => (
                       <Row
                         key={item.id}
-                        theme={theme}
                         title={item.title}
                         subtitle={`${item.requestNumber} · ${item.property?.name || item.property?.code || "No property"}`}
                         meta={`${item.priority} · ${item.status}`}
@@ -549,7 +481,7 @@ export default function SuperOwnerOrganizationsPage() {
           )}
         </section>
       </div>
-    </main>
+    </SuperOwnerShell>
   );
 }
 
@@ -557,101 +489,55 @@ function Metric({
   icon,
   label,
   value,
-  theme,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string | number;
-  theme: ThemeMode;
 }) {
-  const t = themeClass[theme];
-
   return (
-    <div className={`rounded-2xl border p-4 ${t.softCard}`}>
-      <div className="mb-3 text-blue-500">{icon}</div>
-      <p className={`text-xs ${t.subtle}`}>{label}</p>
-      <p className={`mt-1 text-lg font-bold ${t.title}`}>{value}</p>
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/[0.03]">
+      <div className="mb-3 text-blue-600 dark:text-blue-300">{icon}</div>
+      <p className="text-xs text-slate-400 dark:text-slate-500">{label}</p>
+      <p className="mt-1 text-lg font-black text-slate-950 dark:text-white">{value}</p>
     </div>
   );
 }
 
-function MiniStat({
-  label,
-  value,
-  theme,
-}: {
-  label: string;
-  value: string | number;
-  theme: ThemeMode;
-}) {
-  const t = themeClass[theme];
-
+function MiniStat({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className={`rounded-xl border px-3 py-2 ${t.card}`}>
-      <p className={`font-bold ${t.title}`}>{value}</p>
-      <p className={`mt-1 ${t.subtle}`}>{label}</p>
+    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-white/10 dark:bg-slate-950/30">
+      <p className="font-black text-slate-950 dark:text-white">{value}</p>
+      <p className="mt-1 text-slate-400 dark:text-slate-500">{label}</p>
     </div>
   );
 }
 
-function Panel({
-  title,
-  children,
-  theme,
-}: {
-  title: string;
-  children: React.ReactNode;
-  theme: ThemeMode;
-}) {
-  const t = themeClass[theme];
-
+function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className={`rounded-3xl border p-5 ${t.card}`}>
-      <h3 className={`text-lg font-bold ${t.title}`}>{title}</h3>
+    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:shadow-2xl dark:shadow-black/20">
+      <h3 className="text-lg font-black text-slate-950 dark:text-white">{title}</h3>
       <div className="mt-4 space-y-3">{children}</div>
     </section>
   );
 }
 
-function Row({
-  title,
-  subtitle,
-  meta,
-  theme,
-}: {
-  title: string;
-  subtitle: string;
-  meta: string;
-  theme: ThemeMode;
-}) {
-  const t = themeClass[theme];
-
+function Row({ title, subtitle, meta }: { title: string; subtitle: string; meta: string }) {
   return (
-    <div className={`flex items-start justify-between gap-3 rounded-2xl border p-4 ${t.softCard}`}>
+    <div className="flex items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/[0.03]">
       <div>
-        <p className={`font-semibold ${t.title}`}>{title}</p>
-        <p className={`mt-1 text-sm ${t.muted}`}>{subtitle}</p>
+        <p className="font-bold text-slate-950 dark:text-white">{title}</p>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>
       </div>
-      <p className={`shrink-0 text-xs ${t.subtle}`}>{meta}</p>
+      <p className="shrink-0 text-xs text-slate-400 dark:text-slate-500">{meta}</p>
     </div>
   );
 }
 
-function EmptyState({
-  title,
-  text,
-  theme,
-}: {
-  title: string;
-  text: string;
-  theme: ThemeMode;
-}) {
-  const t = themeClass[theme];
-
+function EmptyState({ title, text }: { title: string; text: string }) {
   return (
-    <div className={`rounded-2xl border border-dashed p-6 text-center ${t.softCard}`}>
-      <p className={`font-semibold ${t.title}`}>{title}</p>
-      <p className={`mt-1 text-sm ${t.subtle}`}>{text}</p>
+    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center dark:border-white/10 dark:bg-white/[0.02]">
+      <p className="font-bold text-slate-950 dark:text-white">{title}</p>
+      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{text}</p>
     </div>
   );
 }
