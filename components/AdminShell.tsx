@@ -18,6 +18,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
+import { logoutWithServer } from "@/components/SessionTimeout";
 
 type StoredUser = {
   id?: string;
@@ -153,9 +154,7 @@ export default function AdminShell({
       .toUpperCase() || "US";
 
   function handleLogout() {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    window.location.href = "/";
+    logoutWithServer("logout");
   }
 
   return (

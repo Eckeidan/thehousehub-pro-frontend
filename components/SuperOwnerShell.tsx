@@ -18,6 +18,7 @@ import {
   Wifi,
   X,
 } from "lucide-react";
+import { logoutWithServer } from "@/components/SessionTimeout";
 
 export type SuperOwnerNavItem =
   | "dashboard"
@@ -123,9 +124,7 @@ export default function SuperOwnerShell({
   }
 
   function handleLogout() {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    window.location.href = "/";
+    logoutWithServer("logout");
   }
 
   const initials = useMemo(() => {

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
+import SessionTimeout from "@/components/SessionTimeout";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://thehousehub.app"),
@@ -47,6 +48,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
+        <SessionTimeout />
         {children}
 
         <Toaster
