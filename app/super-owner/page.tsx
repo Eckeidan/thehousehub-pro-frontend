@@ -48,6 +48,13 @@ type OrganizationSummary = {
     payments: number;
     maintenanceRequests: number;
   };
+  _count?: {
+    users: number;
+    properties: number;
+    tenants: number;
+    payments: number;
+    maintenanceRequests: number;
+  };
   paymentVolume: number;
 };
 
@@ -137,6 +144,19 @@ function getTenantName(transaction: PlatformTransaction) {
 function getPropertyName(transaction: PlatformTransaction) {
   const property = transaction.lease?.property;
   return property?.name || property?.code || "No property";
+}
+
+function getOrganizationCounts(organization: Organization) {
+  return (
+    organization.counts ||
+    organization._count || {
+      users: 0,
+      properties: 0,
+      tenants: 0,
+      payments: 0,
+      maintenanceRequests: 0,
+    }
+  );
 }
 
 export default function SuperOwnerPage() {
@@ -370,7 +390,10 @@ export default function SuperOwnerPage() {
               {filteredOrganizations.length === 0 ? (
                 <EmptyState title="No organizations yet" text="New landlord accounts will appear here as soon as they onboard." />
               ) : (
-                filteredOrganizations.map((organization) => (
+                filteredOrganizations.map((organization) => {
+                  const counts = getOrganizationCounts(organization);
+
+                  return (
                   <article key={organization.id} className="rounded-2xl border border-white/10 bg-slate-900/80 p-4">
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                       <div>
@@ -380,8 +403,8 @@ export default function SuperOwnerPage() {
                       </div>
 
                       <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                        <MiniStat label="Properties" value={organization.counts.properties} />
-                        <MiniStat label="Tenants" value={organization.counts.tenants} />
+                        <MiniStat label="Properties" value={counts.properties} />
+                        <MiniStat label="Tenants" value={counts.tenants} />
                         <MiniStat label="Volume" value={formatCurrency(organization.paymentVolume)} />
                       </div>
                     </div>
@@ -421,7 +444,8 @@ export default function SuperOwnerPage() {
                       </div>
                     </div>
                   </article>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
