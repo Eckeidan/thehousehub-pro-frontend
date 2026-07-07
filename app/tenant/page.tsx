@@ -4,6 +4,15 @@ import { useEffect, useMemo, useState, type ReactNode, type FormEvent } from "re
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import {
   Home,
   CreditCard,
   Wrench,
@@ -24,11 +33,15 @@ import {
   Mail,
   Sparkles,
   ShieldCheck,
-  DoorOpen,
   Layers3,
   Menu,
   X,
   Lock,
+  Bot,
+  Send,
+  TrendingUp,
+  ClipboardCheck,
+  TimerReset,
 } from "lucide-react";
 import TenantAIWidget from "@/components/TenantAIWidget";
 
@@ -58,9 +71,15 @@ type AuthUser = {
       code?: string | null;
       addressLine1?: string | null;
       city?: string | null;
+      state?: string | null;
+      postalCode?: string | null;
       country?: string | null;
       monthlyRent?: string | number | null;
       occupancyStatus?: string | null;
+      floor?: number | null;
+      bedrooms?: number | null;
+      bathrooms?: number | null;
+      areaSqm?: string | number | null;
     } | null;
     unit?: {
       id: string;
@@ -134,6 +153,28 @@ function formatDate(value?: string | null) {
     month: "short",
     day: "numeric",
   });
+}
+
+function formatShortMonth(date: Date) {
+  return date.toLocaleDateString("en-US", { month: "short" });
+}
+
+function getMonthKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function clampPercent(value: number) {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function getDaysUntil(value?: string | null) {
+  if (!value) return null;
+  const target = new Date(value);
+  if (Number.isNaN(target.getTime())) return null;
+
+  const today = new Date();
+  const dayMs = 1000 * 60 * 60 * 24;
+  return Math.ceil((target.getTime() - today.getTime()) / dayMs);
 }
 
 function getInitials(name?: string | null) {
@@ -460,6 +501,73 @@ export default function TenantPortalPage() {
   );
 
   const latestPayment = payments.length > 0 ? payments[0] : null;
+  const rentProgress = activeMonthlyRent
+    ? clampPercent((Number(currentMonthPaidAmount || 0) / activeMonthlyRent) * 100)
+    : 0;
+  const paidPaymentCount = payments.filter(
+    (p) => String(p.status || "").toUpperCase() === "PAID"
+  ).length;
+  const resolvedMaintenanceCount = maintenance.filter((m) =>
+    ["RESOLVED", "CLOSED"].includes(String(m.status || "").toUpperCase())
+  ).length;
+  const leaseDaysRemaining = getDaysUntil(leaseEndDate);
+
+  const paymentChartData = useMemo(() => {
+    const now = new Date();
+
+    return Array.from({ length: 6 }, (_, index) => {
+      const monthDate = new Date(now.getFullYear(), now.getMonth() - (5 - index), 1);
+      const monthKey = getMonthKey(monthDate);
+      const paid = payments
+        .filter((payment) => {
+          const status = String(payment.status || "").toUpperCase();
+          const paymentDate = new Date(payment.paymentDate);
+
+          return (
+            status === "PAID" &&
+            !Number.isNaN(paymentDate.getTime()) &&
+            getMonthKey(paymentDate) === monthKey
+          );
+        })
+        .reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+
+      return {
+        month: formatShortMonth(monthDate),
+        paid,
+        rent: activeMonthlyRent,
+      };
+    });
+  }, [activeMonthlyRent, payments]);
+
+  const nextActions = [
+    {
+      title: remainingBalance > 0 ? "Pay remaining balance" : "Rent is current",
+      detail:
+        remainingBalance > 0
+          ? `${formatMoney(remainingBalance)} remaining this month`
+          : "No balance due for the current month",
+      href: "/tenant/payments",
+      icon: <CreditCard className="h-4 w-4" />,
+    },
+    {
+      title: pendingMaintenance > 0 ? "Track open repairs" : "No open repairs",
+      detail:
+        pendingMaintenance > 0
+          ? `${pendingMaintenance} request${pendingMaintenance > 1 ? "s" : ""} still active`
+          : "Create a request if something needs attention",
+      href: "/tenant/maintenance",
+      icon: <Wrench className="h-4 w-4" />,
+    },
+    {
+      title: documents.length > 0 ? "Review documents" : "Documents area ready",
+      detail:
+        documents.length > 0
+          ? `${documents.length} shared file${documents.length > 1 ? "s" : ""} available`
+          : "Lease files and notices will appear here",
+      href: "/tenant/documents",
+      icon: <FileText className="h-4 w-4" />,
+    },
+  ];
 
   if (checkingAuth || loading) {
     return (
@@ -648,6 +756,143 @@ export default function TenantPortalPage() {
                 <KpiCard title="Available Documents" value={String(documents.length)} subtitle="Files accessible to you" icon={<FileText className="h-5 w-5" />} accent="indigo" />
               </section>
 
+              <section className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-[1.35fr_0.65fr]">
+                <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-emerald-700">
+                        <TrendingUp className="h-3.5 w-3.5" />
+                        Rent health
+                      </div>
+                      <h3 className="mt-3 text-2xl font-semibold text-slate-900">
+                        Payment Progress
+                      </h3>
+                      <p className="mt-1 text-sm text-slate-500">
+                        Six-month view of rent paid against the current monthly rent.
+                      </p>
+                    </div>
+
+                    <div className="min-w-44 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        This month
+                      </p>
+                      <p className="mt-2 text-3xl font-bold text-slate-950">
+                        {rentProgress}%
+                      </p>
+                      <div className="mt-3 h-2 rounded-full bg-slate-200">
+                        <div
+                          className="h-2 rounded-full bg-gradient-to-r from-blue-600 to-emerald-500"
+                          style={{ width: `${rentProgress}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 h-72">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={paymentChartData} margin={{ left: 0, right: 8, top: 16, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="paidGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#2563eb" stopOpacity={0.32} />
+                            <stop offset="95%" stopColor="#2563eb" stopOpacity={0.02} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                        <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: "#64748b", fontSize: 12 }} />
+                        <YAxis axisLine={false} tickLine={false} tick={{ fill: "#64748b", fontSize: 12 }} tickFormatter={(value) => `$${Number(value).toLocaleString()}`} width={64} />
+                        <Tooltip
+                          formatter={(value, name) => [
+                            formatMoney(Number(value || 0)),
+                            String(name) === "paid" ? "Paid" : "Expected rent",
+                          ]}
+                          labelClassName="font-semibold text-slate-900"
+                          contentStyle={{
+                            borderRadius: 16,
+                            border: "1px solid #e2e8f0",
+                            boxShadow: "0 16px 40px rgba(15, 23, 42, 0.12)",
+                          }}
+                        />
+                        <Area type="monotone" dataKey="rent" stroke="#94a3b8" strokeDasharray="5 5" fill="transparent" strokeWidth={2} />
+                        <Area type="monotone" dataKey="paid" stroke="#2563eb" fill="url(#paidGradient)" strokeWidth={3} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                <div className="grid gap-6">
+                  <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-slate-950 text-white shadow-sm">
+                    <div className="relative p-6">
+                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(37,99,235,0.45),transparent_34%),radial-gradient(circle_at_bottom_left,rgba(16,185,129,0.28),transparent_35%)]" />
+                      <div className="relative">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/15">
+                          <Bot className="h-6 w-6" />
+                        </div>
+                        <h3 className="mt-5 text-2xl font-semibold">
+                          Tenant AI Chat
+                        </h3>
+                        <p className="mt-2 text-sm leading-6 text-blue-100/75">
+                          Ask about payments, lease dates, documents, or describe a maintenance issue in plain language.
+                        </p>
+
+                        <div className="mt-5 grid gap-2 text-sm text-blue-50/90">
+                          <ChatPrompt text="What is my remaining rent balance?" />
+                          <ChatPrompt text="Help me report a maintenance issue." />
+                          <ChatPrompt text="Where are my lease documents?" />
+                        </div>
+
+                        <Link
+                          href="/tenant/chatbot"
+                          className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-bold text-slate-950 transition hover:bg-blue-50"
+                        >
+                          Open Chat
+                          <Send className="h-4 w-4" />
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+                    <h3 className="text-xl font-semibold text-slate-900">
+                      Monthly Action Plan
+                    </h3>
+                    <div className="mt-5 space-y-3">
+                      {nextActions.map((action) => (
+                        <Link
+                          key={action.title}
+                          href={action.href}
+                          className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:border-blue-200 hover:bg-blue-50"
+                        >
+                          <span className="mt-0.5 rounded-xl bg-white p-2 text-blue-600">
+                            {action.icon}
+                          </span>
+                          <span>
+                            <span className="block text-sm font-semibold text-slate-900">
+                              {action.title}
+                            </span>
+                            <span className="mt-1 block text-xs leading-5 text-slate-500">
+                              {action.detail}
+                            </span>
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <MiniMetric
+                      label="Paid Records"
+                      value={String(paidPaymentCount)}
+                      detail="Confirmed payments"
+                    />
+                    <MiniMetric
+                      label="Resolved Repairs"
+                      value={String(resolvedMaintenanceCount)}
+                      detail="Closed service items"
+                    />
+                  </div>
+                </div>
+              </section>
+
               <section className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-3">
                 <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm xl:col-span-2">
                   <h3 className="text-2xl font-semibold text-slate-900">
@@ -659,11 +904,12 @@ export default function TenantPortalPage() {
 
                   <div className="mt-6 grid gap-4 md:grid-cols-2">
                     <InfoCard icon={<Building2 className="h-5 w-5" />} label="Property" value={user?.tenant?.property?.name || user?.tenant?.property?.code || "Not assigned"} />
-                    <InfoCard icon={<DoorOpen className="h-5 w-5" />} label="Unit" value={user?.tenant?.unit?.unitCode || "No unit assigned"} />
-                    <InfoCard icon={<MapPin className="h-5 w-5" />} label="Address" value={user?.tenant?.property?.addressLine1 || "No address available"} />
+                    <InfoCard icon={<MapPin className="h-5 w-5" />} label="Address" value={[user?.tenant?.property?.addressLine1, user?.tenant?.property?.city, user?.tenant?.property?.state, user?.tenant?.property?.postalCode].filter(Boolean).join(", ") || "No address available"} />
                     <InfoCard icon={<CalendarDays className="h-5 w-5" />} label="Lease Period" value={`${formatDate(currentLease?.startDate || user?.tenant?.leaseStartDate)} → ${formatDate(currentLease?.endDate || user?.tenant?.leaseEndDate)}`} />
                     <InfoCard icon={<ShieldCheck className="h-5 w-5" />} label="Occupancy Status" value={user?.tenant?.property?.occupancyStatus || user?.tenant?.unit?.occupancyStatus || "N/A"} />
-                    <InfoCard icon={<Layers3 className="h-5 w-5" />} label="Floor / Beds / Baths" value={`Floor ${user?.tenant?.unit?.floor ?? "—"} • ${user?.tenant?.unit?.bedrooms ?? "—"} bed • ${user?.tenant?.unit?.bathrooms ?? "—"} bath`} />
+                    <InfoCard icon={<Layers3 className="h-5 w-5" />} label="Floor / Beds / Baths" value={`Floor ${user?.tenant?.property?.floor ?? user?.tenant?.unit?.floor ?? "—"} • ${user?.tenant?.property?.bedrooms ?? user?.tenant?.unit?.bedrooms ?? "—"} bed • ${user?.tenant?.property?.bathrooms ?? user?.tenant?.unit?.bathrooms ?? "—"} bath`} />
+                    <InfoCard icon={<ClipboardCheck className="h-5 w-5" />} label="Last Payment" value={latestPayment ? `${formatMoney(latestPayment.amount)} • ${formatDate(latestPayment.paymentDate)}` : "No payment yet"} />
+                    <InfoCard icon={<TimerReset className="h-5 w-5" />} label="Lease Countdown" value={leaseDaysRemaining === null ? "Not set" : leaseDaysRemaining >= 0 ? `${leaseDaysRemaining} day${leaseDaysRemaining === 1 ? "" : "s"} remaining` : "Lease date passed"} />
                   </div>
                 </div>
 
@@ -990,6 +1236,34 @@ function InfoCard({ icon, label, value }: { icon: ReactNode; label: string; valu
           <p className="mt-1 text-sm font-medium text-slate-900">{value}</p>
         </div>
       </div>
+    </div>
+  );
+}
+
+function ChatPrompt({ text }: { text: string }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3">
+      {text}
+    </div>
+  );
+}
+
+function MiniMetric({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+}) {
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        {label}
+      </p>
+      <p className="mt-3 text-3xl font-bold text-slate-950">{value}</p>
+      <p className="mt-2 text-xs text-slate-500">{detail}</p>
     </div>
   );
 }
