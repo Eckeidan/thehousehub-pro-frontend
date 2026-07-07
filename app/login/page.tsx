@@ -76,7 +76,8 @@ export default function LoginPage() {
       setSuccess("Login successful. Redirecting...");
 
       setTimeout(() => {
-        if (role === "admin") window.location.href = "/dashboard";
+        if (role === "super_owner") window.location.href = "/super-owner";
+        else if (role === "admin") window.location.href = "/dashboard";
         else if (role === "owner") window.location.href = "/owner";
         else if (role === "tenant") window.location.href = "/tenant";
         else window.location.href = "/dashboard";
