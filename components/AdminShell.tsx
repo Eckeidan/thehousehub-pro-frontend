@@ -11,6 +11,7 @@ import {
   FileText,
   MessageCircle,
   Brain,
+  BarChart3,
   Settings,
   LogOut,
   Menu,
@@ -46,6 +47,7 @@ type AdminShellProps = {
     | "communications"
     | "AI Assistant"
     | "documents"
+    | "reports"
     | "insights"
     | "settings";
   title: string;
@@ -109,6 +111,12 @@ const menuItems = [
     label: "Documents",
     href: "/documents",
     icon: <FileText size={18} />,
+  },
+  {
+    key: "reports",
+    label: "Reports",
+    href: "/reports",
+    icon: <BarChart3 size={18} />,
   },
   {
     key: "insights",
