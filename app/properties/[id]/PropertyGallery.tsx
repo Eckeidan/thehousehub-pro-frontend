@@ -209,10 +209,12 @@ export default function PropertyGallery({
                 className="h-full min-h-[460px] w-full"
                 onClick={() => setPreviewOpen(true)}
               >
-                <img
+                <GalleryImage
                   src={getImageSrc(selected.imageUrl)}
                   alt={selected.fileName || "Property image"}
                   className="h-full w-full cursor-zoom-in object-cover"
+                  fallbackClassName="min-h-[460px]"
+                  fileName={selected.fileName}
                 />
               </button>
             ) : (
@@ -241,10 +243,12 @@ export default function PropertyGallery({
                     className="block h-36 w-full"
                     onClick={() => setSelected(image)}
                   >
-                    <img
+                    <GalleryImage
                       src={getImageSrc(image.imageUrl)}
                       alt={image.fileName || "Thumbnail"}
                       className="h-full w-full object-cover"
+                      fallbackClassName="h-36"
+                      fileName={image.fileName}
                     />
                   </button>
 
@@ -305,10 +309,12 @@ export default function PropertyGallery({
               Close
             </button>
 
-            <img
+            <GalleryImage
               src={getImageSrc(selected.imageUrl)}
               alt={selected.fileName || "Property image"}
               className="max-h-[90vh] max-w-[95vw] rounded-2xl object-contain shadow-2xl"
+              fallbackClassName="h-[60vh] w-[80vw] max-w-3xl"
+              fileName={selected.fileName}
             />
           </div>
         </div>
@@ -347,5 +353,49 @@ export default function PropertyGallery({
         </div>
       )}
     </div>
+  );
+}
+
+function GalleryImage({
+  src,
+  alt,
+  className,
+  fallbackClassName = "",
+  fileName,
+}: {
+  src: string;
+  alt: string;
+  className: string;
+  fallbackClassName?: string;
+  fileName?: string | null;
+}) {
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const failed = Boolean(src && failedSrc === src);
+
+  if (!src || failed) {
+    return (
+      <div
+        className={`flex w-full flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-center text-slate-500 ${fallbackClassName}`}
+      >
+        <ImageIcon className="mb-3 h-8 w-8 text-slate-400" />
+        <p className="text-sm font-semibold text-slate-700">Image unavailable</p>
+        <p className="mt-1 max-w-full truncate text-xs">
+          {fileName || alt || "This image needs to be uploaded again."}
+        </p>
+        <p className="mt-2 text-xs text-slate-400">
+          Re-upload this photo to restore it.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={className}
+      loading="lazy"
+      onError={() => setFailedSrc(src)}
+    />
   );
 }
