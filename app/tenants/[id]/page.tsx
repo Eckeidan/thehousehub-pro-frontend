@@ -15,7 +15,6 @@ import {
   DollarSign,
   Landmark,
   BadgeCheck,
-  DoorOpen,
   UserPlus,
   RefreshCw,
   Copy,
@@ -53,6 +52,10 @@ interface Property {
   monthlyRent?: string | number | null;
   currentValue?: string | number | null;
   occupancyStatus?: string | null;
+  floor?: number | null;
+  bedrooms?: number | null;
+  bathrooms?: number | null;
+  areaSqm?: string | number | null;
 }
 
 interface Unit {
@@ -271,7 +274,19 @@ export default function TenantDetailsPage() {
 
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [createdPassword, setCreatedPassword] = useState("");
+  const [createdCredentialEmail, setCreatedCredentialEmail] = useState("");
+  const [credentialTitle, setCredentialTitle] = useState("Tenant Account Created");
+  const [credentialMessage, setCredentialMessage] = useState(
+    "The tenant login account has been created successfully."
+  );
+  const [credentialEmailSent, setCredentialEmailSent] = useState<boolean | null>(
+    null
+  );
+  const [resettingPassword, setResettingPassword] = useState(false);
+  const [resetMessage, setResetMessage] = useState("");
   const [passwordCopied, setPasswordCopied] = useState(false);
+  const [emailCopied, setEmailCopied] = useState(false);
+  const [loginCopied, setLoginCopied] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -461,6 +476,22 @@ export default function TenantDetailsPage() {
     }
   }
 
+  async function handleCopyText(
+    value: string,
+    setFlag: (value: boolean) => void
+  ) {
+    try {
+      await navigator.clipboard.writeText(value);
+      setFlag(true);
+
+      setTimeout(() => {
+        setFlag(false);
+      }, 2000);
+    } catch (err) {
+      console.error("Copy text error:", err);
+    }
+  }
+
   async function handleCreateTenantAccount() {
     if (!tenant) return;
 
@@ -532,6 +563,10 @@ export default function TenantDetailsPage() {
 
       await fetchTenant();
 
+      setCredentialTitle("Tenant Account Created");
+      setCredentialMessage("The tenant login account has been created successfully.");
+      setCreatedCredentialEmail(accountEmail.trim());
+      setCredentialEmailSent(null);
       setCreatedPassword(passwordToStore);
       setPasswordCopied(false);
       setShowSuccessModal(true);
@@ -540,6 +575,56 @@ export default function TenantDetailsPage() {
       setAccountMessage(err?.message || "Failed to create tenant account.");
     } finally {
       setCreatingAccount(false);
+    }
+  }
+
+  async function handleResetTenantPassword() {
+    if (!tenant?.user) return;
+
+    try {
+      setResettingPassword(true);
+      setResetMessage("");
+
+      const token = localStorage.getItem("token");
+
+      const res = await fetch(`${API_URL}/api/tenants/${tenant.id}/reset-password`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token || ""}`,
+        },
+      });
+
+      if (res.status === 401) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        router.replace("/");
+        return;
+      }
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        setResetMessage(data?.error || "Failed to reset tenant password.");
+        return;
+      }
+
+      await fetchTenant();
+
+      setCredentialTitle("Tenant Password Reset");
+      setCredentialMessage(
+        data?.message || "A new temporary password has been generated."
+      );
+      setCreatedCredentialEmail(data?.user?.email || tenant.user.email || "");
+      setCredentialEmailSent(Boolean(data?.emailSent));
+      setCreatedPassword(data?.password || "");
+      setPasswordCopied(false);
+      setShowSuccessModal(true);
+    } catch (err: any) {
+      console.error("Reset tenant password error:", err);
+      setResetMessage(err?.message || "Failed to reset tenant password.");
+    } finally {
+      setResettingPassword(false);
     }
   }
 
@@ -591,9 +676,20 @@ export default function TenantDetailsPage() {
   }
 
   const resolvedStatus = getTenantStatus(tenant);
-  const rentToDisplay = tenant.unit?.monthlyRent ?? tenant.property?.monthlyRent;
+  const rentToDisplay = tenant.property?.monthlyRent ?? tenant.unit?.monthlyRent;
   const tenantHasAccount = !!tenant.user;
   const occupancyPeriod = getOccupancyPeriod(tenant);
+  const loginUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/login`
+      : "https://thehousehub.app/login";
+  const portalEmail = tenant.user?.email || tenant.email || "No email";
+  const propertyFloor = tenant.property?.floor ?? tenant.unit?.floor;
+  const propertyBedrooms = tenant.property?.bedrooms ?? tenant.unit?.bedrooms;
+  const propertyBathrooms = tenant.property?.bathrooms ?? tenant.unit?.bathrooms;
+  const propertyArea = tenant.property?.areaSqm ?? tenant.unit?.areaSqm;
+  const propertyOccupancy =
+    tenant.property?.occupancyStatus || tenant.unit?.occupancyStatus || null;
   const propertyAddress =
     [
       tenant.property?.addressLine1,
@@ -669,14 +765,104 @@ export default function TenantDetailsPage() {
         </div>
       )}
 
-      {tenantHasAccount && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-700">
-          Tenant account exists:{" "}
-          <span className="font-semibold">
-            {tenant.user?.email || "No email"}
-          </span>
+      <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-start gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 ring-1 ring-blue-100">
+              <ShieldCheck className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-sm font-bold uppercase tracking-wide text-slate-400">
+                Tenant Portal Access
+              </p>
+              <h2 className="mt-1 text-xl font-bold text-slate-950">
+                {tenantHasAccount ? "Login credentials are available" : "No portal account yet"}
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Share the login URL and email with the tenant. Passwords are never stored in plain text; reset generates a new temporary password.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {!tenantHasAccount && canEdit && (
+              <button
+                onClick={openCreateAccountModal}
+                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
+              >
+                <UserPlus className="h-4 w-4" />
+                Create Account
+              </button>
+            )}
+            {tenantHasAccount && canEdit && (
+              <button
+                onClick={handleResetTenantPassword}
+                disabled={resettingPassword}
+                className="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-700 shadow-sm transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {resettingPassword ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                {resettingPassword ? "Resetting..." : "Reset Password"}
+              </button>
+            )}
+          </div>
         </div>
-      )}
+
+        <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-3">
+          <DetailTile
+            label="Login URL"
+            value={
+              <span className="flex items-center justify-between gap-2">
+                <span className="truncate">{loginUrl}</span>
+                <button
+                  type="button"
+                  onClick={() => handleCopyText(loginUrl, setLoginCopied)}
+                  className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                  {loginCopied ? "Copied" : "Copy"}
+                </button>
+              </span>
+            }
+          />
+          <DetailTile
+            label="Login Email"
+            value={
+              <span className="flex items-center justify-between gap-2">
+                <span className="truncate">{portalEmail}</span>
+                {portalEmail !== "No email" && (
+                  <button
+                    type="button"
+                    onClick={() => handleCopyText(portalEmail, setEmailCopied)}
+                    className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    {emailCopied ? "Copied" : "Copy"}
+                  </button>
+                )}
+              </span>
+            }
+          />
+          <DetailTile
+            label="Account Status"
+            value={tenantHasAccount ? "Created" : "Not created"}
+            detail={
+              tenant.user?.mustChangePassword
+                ? "Tenant must change password at next login"
+                : undefined
+            }
+          />
+        </div>
+
+        {resetMessage && (
+          <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            {resetMessage}
+          </div>
+        )}
+      </section>
 
       {error && (
         <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700">
@@ -747,7 +933,10 @@ export default function TenantDetailsPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <DetailTile label="Rent" value={formatMoney(rentToDisplay)} />
-              <DetailTile label="Unit" value={tenant.unit?.unitCode || "None"} />
+              <DetailTile
+                label="Occupancy"
+                value={propertyOccupancy || "N/A"}
+              />
               <DetailTile
                 label="Property Code"
                 value={tenant.property?.code || "N/A"}
@@ -813,7 +1002,7 @@ export default function TenantDetailsPage() {
             <div className="flex items-center justify-between rounded-2xl bg-emerald-50 px-4 py-4">
               <div className="flex items-center gap-2 text-emerald-700">
                 <DollarSign className="h-4 w-4" />
-                <span className="text-sm font-medium">Unit Rent</span>
+                <span className="text-sm font-medium">Monthly Rent</span>
               </div>
               <span className="text-sm font-bold text-emerald-700">
                 {formatMoney(rentToDisplay)}
@@ -876,43 +1065,31 @@ export default function TenantDetailsPage() {
               value={
                 <span
                   className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${occupancyBadge(
-                    tenant.property?.occupancyStatus
+                    propertyOccupancy
                   )}`}
                 >
-                  {tenant.property?.occupancyStatus || "N/A"}
+                  {propertyOccupancy || "N/A"}
                 </span>
               }
             />
-            <DetailTile
-              label="Assigned Unit"
-              value={
-                <span className="inline-flex items-center gap-2">
-                  <DoorOpen className="h-4 w-4 text-slate-400" />
-                  {tenant.unit?.unitCode || "No unit assigned"}
-                  {tenant.unit?.unitName ? ` - ${tenant.unit.unitName}` : ""}
-                </span>
-              }
-            />
-            <DetailTile label="Floor" value={String(tenant.unit?.floor ?? "-")} />
+            <DetailTile label="Floor" value={String(propertyFloor ?? "-")} />
             <DetailTile
               label="Beds / Baths"
-              value={`${tenant.unit?.bedrooms ?? "-"} / ${
-                tenant.unit?.bathrooms ?? "-"
-              }`}
+              value={`${propertyBedrooms ?? "-"} / ${propertyBathrooms ?? "-"}`}
             />
             <DetailTile
               label="Area"
-              value={tenant.unit?.areaSqm ? `${tenant.unit.areaSqm} sqm` : "-"}
+              value={propertyArea ? `${propertyArea} sqm` : "-"}
             />
             <DetailTile
-              label="Unit Occupancy"
+              label="Occupancy"
               value={
                 <span
                   className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${occupancyBadge(
-                    tenant.unit?.occupancyStatus
+                    propertyOccupancy
                   )}`}
                 >
-                  {tenant.unit?.occupancyStatus || "N/A"}
+                  {propertyOccupancy || "N/A"}
                 </span>
               }
             />
@@ -997,7 +1174,7 @@ export default function TenantDetailsPage() {
                   <span className="font-semibold text-slate-800">
                     {tenant.firstName} {tenant.lastName}
                   </span>
-                  ? This will mark the tenant as inactive and set the unit as
+                  ? This will mark the tenant as inactive and update the assigned property as
                   available.
                 </p>
               </div>
@@ -1146,10 +1323,10 @@ export default function TenantDetailsPage() {
 
                 <div>
                   <h2 className="text-xl font-bold text-slate-800">
-                    Tenant Account Created
+                    {credentialTitle}
                   </h2>
                   <p className="mt-1 text-sm text-slate-500">
-                    The tenant login account has been created successfully.
+                    {credentialMessage}
                   </p>
                 </div>
               </div>
@@ -1163,9 +1340,49 @@ export default function TenantDetailsPage() {
               </button>
             </div>
 
-            <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+            <div className="mt-6 space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+              <div className="rounded-xl bg-white px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                  Login URL
+                </p>
+                <div className="mt-2 flex items-center justify-between gap-3">
+                  <span className="truncate text-sm font-semibold text-slate-800">
+                    {loginUrl}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyText(loginUrl, setLoginCopied)}
+                    className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    {loginCopied ? "Copied" : "Copy"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="rounded-xl bg-white px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                  Login Email
+                </p>
+                <div className="mt-2 flex items-center justify-between gap-3">
+                  <span className="truncate text-sm font-semibold text-slate-800">
+                    {createdCredentialEmail || portalEmail}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleCopyText(createdCredentialEmail || portalEmail, setEmailCopied)
+                    }
+                    className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    {emailCopied ? "Copied" : "Copy"}
+                  </button>
+                </div>
+              </div>
+
               <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
-                Generated Password
+                Temporary Password
               </p>
 
               <div className="mt-2 flex items-center justify-between gap-3 rounded-xl bg-white px-4 py-3">
@@ -1187,6 +1404,12 @@ export default function TenantDetailsPage() {
                 Please copy this password now and send it to the tenant. The
                 tenant should change it after the first login.
               </p>
+
+              {credentialEmailSent !== null && (
+                <p className="text-xs leading-5 text-emerald-700">
+                  Email delivery: {credentialEmailSent ? "sent" : "not confirmed"}
+                </p>
+              )}
             </div>
 
             <div className="mt-6 flex justify-end">
