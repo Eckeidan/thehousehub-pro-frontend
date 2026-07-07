@@ -18,6 +18,9 @@ import {
   UserCircle2,
   AlertCircle,
   ShieldCheck,
+  CalendarDays,
+  MapPin,
+  KeyRound,
 } from "lucide-react";
 import AdminShell from "@/components/AdminShell";
 
@@ -73,6 +76,19 @@ function getOccupancyPeriod(tenant: Tenant) {
   return `${start} → ${end}`;
 }
 
+function getOccupancyDays(tenant: Tenant) {
+  if (!tenant.leaseStartDate || !tenant.leaseEndDate) return null;
+
+  const start = new Date(tenant.leaseStartDate).getTime();
+  const end = new Date(tenant.leaseEndDate).getTime();
+
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) {
+    return null;
+  }
+
+  return Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
+}
+
 function statusBadge(status: TenantStatus) {
   switch (status) {
     case "ACTIVE":
@@ -109,6 +125,10 @@ function getTenantStatus(tenant: Tenant): TenantStatus {
   if (tenant.status) return tenant.status;
   if (tenant.isActive === false) return "INACTIVE";
   return "ACTIVE";
+}
+
+function getTenantName(tenant: Tenant) {
+  return `${tenant.firstName || ""} ${tenant.lastName || ""}`.trim() || "Unnamed Tenant";
 }
 
 export default function TenantsPage() {
@@ -451,14 +471,32 @@ export default function TenantsPage() {
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+          <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h2 className="text-xl font-bold text-slate-950">
+                Tenant Portfolio
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Review occupants, lease status, property assignment, and tenant access.
+              </p>
+            </div>
+            <div className="rounded-2xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-600">
+              Showing {filteredTenants.length} of {tenants.length}
+            </div>
+          </div>
+
           {loading ? (
-            <div className="flex items-center justify-center gap-3 px-6 py-16 text-slate-500">
-              <Loader2 className="h-5 w-5 animate-spin" />
-              Loading tenants...
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 2xl:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="h-80 animate-pulse rounded-3xl border border-slate-200 bg-slate-100"
+                />
+              ))}
             </div>
           ) : filteredTenants.length === 0 ? (
-            <div className="px-6 py-16 text-center">
+            <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 px-6 py-16 text-center">
               <Users className="mx-auto h-12 w-12 text-slate-300" />
               <h3 className="mt-4 text-lg font-semibold text-slate-700">
                 No tenants found
@@ -470,149 +508,162 @@ export default function TenantsPage() {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-[1100px] text-sm">
-                <thead className="bg-slate-50">
-                  <tr className="text-left text-slate-600">
-                    <th className="px-6 py-4 font-semibold">Tenant</th>
-                    <th className="px-6 py-4 font-semibold">Contact</th>
-                    <th className="px-6 py-4 font-semibold">Property</th>
-                    <th className="px-6 py-4 font-semibold">Status</th>
-                    <th className="px-6 py-4 font-semibold">Lease</th>
-                    <th className="px-6 py-4 font-semibold">
-                      Occupancy Period
-                    </th>
-                    <th className="px-6 py-4 text-right font-semibold">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 2xl:grid-cols-3">
+              {filteredTenants.map((tenant) => {
+                const resolvedStatus = getTenantStatus(tenant);
+                const tenantName = getTenantName(tenant);
+                const occupancyDays = getOccupancyDays(tenant);
+                const propertyName =
+                  tenant.property?.name || tenant.property?.code || "Not assigned";
 
-                <tbody className="divide-y divide-slate-100">
-                  {filteredTenants.map((tenant) => {
-                    const resolvedStatus = getTenantStatus(tenant);
+                return (
+                  <article
+                    key={tenant.id}
+                    className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-xl"
+                  >
+                    <div className="relative min-h-40 bg-slate-950 p-5 text-white">
+                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(37,99,235,0.48),_transparent_35%),linear-gradient(135deg,_#111827,_#172554_55%,_#064e3b)]" />
+                      <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full border border-white/15" />
+                      <div className="absolute bottom-3 right-5 text-6xl font-black text-white/10">
+                        {getInitials(tenant.firstName, tenant.lastName)}
+                      </div>
 
-                    return (
-                      <tr key={tenant.id} className="hover:bg-slate-50/70">
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-100 font-semibold text-blue-700">
-                              {getInitials(tenant.firstName, tenant.lastName)}
-                            </div>
-                            <div>
-                              <p className="font-semibold text-slate-800">
-                                {tenant.firstName} {tenant.lastName}
-                              </p>
-                              <p className="text-xs text-slate-500">
-                                Tenant ID: #{tenant.id}
-                                <br />
-                                <span className="font-mono text-[10px] text-emerald-600">
-                                  Org: {tenant.organizationId || "-"}
-                                </span>
-                              </p>
-                            </div>
-                          </div>
-                        </td>
+                      <div className="relative flex items-start justify-between gap-4">
+                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 text-lg font-black backdrop-blur">
+                          {getInitials(tenant.firstName, tenant.lastName) || "T"}
+                        </div>
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-bold ${
+                            resolvedStatus === "ACTIVE"
+                              ? "bg-emerald-400/20 text-emerald-100 ring-1 ring-emerald-300/40"
+                              : resolvedStatus === "PENDING"
+                                ? "bg-amber-400/20 text-amber-100 ring-1 ring-amber-300/40"
+                                : "bg-white/15 text-white/80 ring-1 ring-white/20"
+                          }`}
+                        >
+                          {resolvedStatus}
+                        </span>
+                      </div>
 
-                        <td className="px-6 py-4">
-                          <div className="space-y-1">
-                            <p className="flex items-center gap-2 text-slate-700">
-                              <Phone className="h-3.5 w-3.5 text-slate-400" />
-                              {tenant.phone || "N/A"}
-                            </p>
-                            <p className="flex items-center gap-2 text-slate-700">
-                              <Mail className="h-3.5 w-3.5 text-slate-400" />
-                              {tenant.email || "N/A"}
-                            </p>
-                          </div>
-                        </td>
+                      <div className="relative mt-8">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-white/60">
+                          Tenant ID #{tenant.id}
+                        </p>
+                        <h3 className="mt-2 line-clamp-2 text-2xl font-bold">
+                          {tenantName}
+                        </h3>
+                      </div>
+                    </div>
 
-                        <td className="px-6 py-4 text-slate-700">
-                          {tenant.property?.name ||
-                            tenant.property?.code ||
-                            "Not assigned"}
-                        </td>
+                    <div className="p-5">
+                      <div className="grid grid-cols-1 gap-3">
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                          <p className="mb-2 text-xs font-semibold uppercase text-slate-400">
+                            Contact
+                          </p>
+                          <p className="flex items-center gap-2 truncate text-sm font-medium text-slate-800">
+                            <Phone className="h-4 w-4 shrink-0 text-slate-400" />
+                            {tenant.phone || "No phone"}
+                          </p>
+                          <p className="mt-1 flex items-center gap-2 truncate text-sm text-slate-600">
+                            <Mail className="h-4 w-4 shrink-0 text-slate-400" />
+                            {tenant.email || "No email"}
+                          </p>
+                        </div>
 
-                        <td className="px-6 py-4">
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                          <p className="mb-2 text-xs font-semibold uppercase text-slate-400">
+                            Property assignment
+                          </p>
+                          <p className="flex items-center gap-2 truncate text-sm font-bold text-slate-900">
+                            <MapPin className="h-4 w-4 shrink-0 text-blue-500" />
+                            {propertyName}
+                          </p>
+                          <p className="mt-1 truncate font-mono text-[11px] text-emerald-600">
+                            Org: {tenant.organizationId || "-"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-2 gap-3">
+                        <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                          <p className="text-xs font-semibold uppercase text-slate-400">
+                            Lease
+                          </p>
                           <span
-                            className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusBadge(
-                              resolvedStatus
-                            )}`}
-                          >
-                            {resolvedStatus}
-                          </span>
-                        </td>
-
-                        <td className="px-6 py-4">
-                          <span
-                            className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${leaseBadge(
+                            className={`mt-2 inline-flex rounded-full px-3 py-1 text-xs font-bold ${leaseBadge(
                               tenant.leaseStatus
                             )}`}
                           >
                             {tenant.leaseStatus || "NO LEASE"}
                           </span>
-                        </td>
+                        </div>
+                        <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                          <p className="text-xs font-semibold uppercase text-slate-400">
+                            Occupancy
+                          </p>
+                          <p className="mt-2 text-lg font-black text-slate-950">
+                            {occupancyDays ? `${occupancyDays} days` : "Not set"}
+                          </p>
+                        </div>
+                      </div>
 
-                        <td className="px-6 py-4">
-                          <div className="space-y-1">
-                            <p className="text-sm font-medium text-slate-700">
-                              {getOccupancyPeriod(tenant)}
-                            </p>
+                      <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                        <p className="flex items-center gap-2 text-xs font-semibold uppercase text-slate-400">
+                          <CalendarDays className="h-4 w-4" />
+                          Occupancy period
+                        </p>
+                        <p className="mt-2 text-sm font-semibold text-slate-800">
+                          {getOccupancyPeriod(tenant)}
+                        </p>
+                        {tenant.leaseStatus === "ACTIVE" && (
+                          <p className="mt-1 text-xs font-medium text-emerald-600">
+                            Current occupancy
+                          </p>
+                        )}
+                      </div>
 
-                            {tenant.leaseStatus === "TERMINATED" && (
-                              <p className="text-xs text-slate-400">
-                                Former occupancy
-                              </p>
-                            )}
+                      <div className="mt-5 flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                        <span className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
+                          <KeyRound className="h-3.5 w-3.5" />
+                          Tenant profile
+                        </span>
 
-                            {tenant.leaseStatus === "ACTIVE" && (
-                              <p className="text-xs text-emerald-600">
-                                Current occupancy
-                              </p>
-                            )}
-                          </div>
-                        </td>
+                        <div className="flex items-center gap-2">
+                          <Link
+                            href={`/tenants/${tenant.id}`}
+                            className="inline-flex items-center gap-1 rounded-xl bg-slate-950 px-3 py-2 text-xs font-bold text-white transition hover:bg-blue-700"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                            View
+                          </Link>
 
-                        <td className="px-6 py-4">
-                          <div className="flex items-center justify-end gap-2">
-                            <Link
-                              href={`/tenants/${tenant.id}`}
-                              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-100"
-                            >
-                              <Eye className="h-3.5 w-3.5" />
-                              View
-                            </Link>
+                          {canEdit ? (
+                            <>
+                              <Link
+                                href={`/tenants/edit/${tenant.id}`}
+                                className="inline-flex items-center gap-1 rounded-xl border border-blue-200 px-3 py-2 text-xs font-bold text-blue-700 transition hover:bg-blue-50"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                                Edit
+                              </Link>
 
-                            {canEdit ? (
-                              <>
-                                <Link
-                                  href={`/tenants/edit/${tenant.id}`}
-                                  className="inline-flex items-center gap-1 rounded-lg border border-blue-200 px-3 py-2 text-xs font-medium text-blue-700 transition hover:bg-blue-50"
-                                >
-                                  <Pencil className="h-3.5 w-3.5" />
-                                  Edit
-                                </Link>
-
-                                <button
-                                  onClick={() => openDeleteModal(tenant)}
-                                  className="inline-flex items-center gap-1 rounded-lg border border-rose-200 px-3 py-2 text-xs font-medium text-rose-700 transition hover:bg-rose-50"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                  Delete
-                                </button>
-                              </>
-                            ) : (
-                              <span className="inline-flex rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-500">
-                                Read only
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                              <button
+                                type="button"
+                                onClick={() => openDeleteModal(tenant)}
+                                className="rounded-xl border border-rose-200 p-2 text-rose-700 transition hover:bg-rose-50"
+                                title="Delete tenant"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           )}
         </div>
