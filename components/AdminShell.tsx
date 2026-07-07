@@ -14,6 +14,8 @@ import {
   Settings,
   LogOut,
   Menu,
+  Bell,
+  ClipboardList,
   Moon,
   Sun,
   X,
@@ -40,6 +42,7 @@ type AdminShellProps = {
     | "vendors"
     | "maintenance"
     | "payments"
+    | "todo"
     | "communications"
     | "AI Assistant"
     | "documents"
@@ -89,6 +92,12 @@ const menuItems = [
     icon: <Wallet size={18} />,
   },
   {
+    key: "todo",
+    label: "To Do",
+    href: "/todo",
+    icon: <ClipboardList size={18} />,
+  },
+  {
     key: "communications",
     label: "Messages",
     href: "/communications",
@@ -118,6 +127,7 @@ const menuItems = [
 const SIDEBAR_COLLAPSED_KEY = "thehousehub.adminSidebarCollapsed";
 const THEME_KEY = "thehousehub.theme";
 const LEGACY_SUPER_OWNER_THEME_KEY = "thehousehub.superOwnerTheme";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 export default function AdminShell({
   user,
@@ -139,6 +149,7 @@ export default function AdminShell({
       localStorage.getItem(LEGACY_SUPER_OWNER_THEME_KEY);
     return savedTheme === "dark" || savedTheme === "light" ? savedTheme : "light";
   });
+  const [todoCount, setTodoCount] = useState(0);
 
   useEffect(() => {
     localStorage.setItem(
@@ -152,6 +163,42 @@ export default function AdminShell({
     localStorage.setItem(THEME_KEY, theme);
     localStorage.setItem(LEGACY_SUPER_OWNER_THEME_KEY, theme);
   }, [theme]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    let cancelled = false;
+
+    async function loadTodoCount() {
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) return;
+
+        const res = await fetch(`${API_BASE}/api/payments/todos`, {
+          cache: "no-store",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!res.ok) return;
+
+        const data = await res.json().catch(() => null);
+
+        if (!cancelled) {
+          setTodoCount(Number(data?.count || 0));
+        }
+      } catch (error) {
+        console.error("Admin todo count error:", error);
+      }
+    }
+
+    loadTodoCount();
+    const interval = window.setInterval(loadTodoCount, 60000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [user]);
 
   function toggleTheme() {
     setTheme((current) => (current === "dark" ? "light" : "dark"));
@@ -352,6 +399,20 @@ export default function AdminShell({
 
             <div className="flex flex-wrap items-center gap-3">
               {actions}
+
+              <Link
+                href="/todo"
+                className="relative inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
+                aria-label="Open approvals"
+                title="Approvals and notifications"
+              >
+                <Bell size={18} />
+                {todoCount > 0 && (
+                  <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-600 px-1.5 text-[10px] font-bold text-white">
+                    {todoCount > 99 ? "99+" : todoCount}
+                  </span>
+                )}
+              </Link>
 
               <button
                 onClick={toggleTheme}
