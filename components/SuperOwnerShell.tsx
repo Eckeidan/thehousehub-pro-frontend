@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   Sun,
   UserPlus,
+  Wifi,
   X,
 } from "lucide-react";
 
@@ -22,6 +23,7 @@ export type SuperOwnerNavItem =
   | "dashboard"
   | "organizations"
   | "create-admin"
+  | "online"
   | "audit";
 
 type StoredUser = {
@@ -71,6 +73,13 @@ const menuItems: Array<{
     description: "Super Owner access",
     href: "/super-owner/create-admin",
     icon: <UserPlus size={18} />,
+  },
+  {
+    key: "online",
+    label: "Online",
+    description: "Active users",
+    href: "/super-owner/online",
+    icon: <Wifi size={18} />,
   },
   {
     key: "audit",

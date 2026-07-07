@@ -11,6 +11,7 @@ import {
   Loader2,
   ShieldCheck,
   Users,
+  Wifi,
   Wrench,
 } from "lucide-react";
 import {
@@ -427,7 +428,7 @@ export default function SuperOwnerPage() {
           </Panel>
         </section>
 
-        <section className="grid gap-4 md:grid-cols-3">
+        <section className="grid gap-4 md:grid-cols-4">
           <QuickLink
             href="/super-owner/organizations"
             icon={<Building2 size={18} />}
@@ -439,6 +440,12 @@ export default function SuperOwnerPage() {
             icon={<ShieldCheck size={18} />}
             title="Create Admin"
             text="Créer un autre Super Owner avec responsabilités ABAC."
+          />
+          <QuickLink
+            href="/super-owner/online"
+            icon={<Wifi size={18} />}
+            title="Online"
+            text="Voir les users et admins actifs récemment dans le système."
           />
           <QuickLink
             href="/super-owner/audit"
