@@ -41,6 +41,13 @@ type StoredUser = {
 type ReportPayload = {
   generatedAt: string;
   organization?: { name?: string; email?: string; companyName?: string } | null;
+  settings?: {
+    companyName?: string | null;
+    email?: string | null;
+    supportEmail?: string | null;
+    logoUrl?: string | null;
+    primaryColor?: string | null;
+  } | null;
   filters: Record<string, string | null>;
   summary: {
     properties: number;
@@ -145,6 +152,132 @@ function toCsv(rows: Array<Record<string, string | number>>) {
     headers.join(","),
     ...rows.map((row) => headers.map((header) => escape(row[header])).join(",")),
   ].join("\n");
+}
+
+function resolveAssetUrl(value?: string | null) {
+  if (!value) return "";
+  if (value.startsWith("http")) return value;
+  return `${API_BASE}${value.startsWith("/") ? "" : "/"}${value}`;
+}
+
+function escapeHtml(value: unknown) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function buildReportHtml(report: ReportPayload) {
+  const company =
+    report.settings?.companyName ||
+    report.organization?.companyName ||
+    report.organization?.name ||
+    "The House Hub";
+  const logoUrl = resolveAssetUrl(report.settings?.logoUrl);
+  const from = report.filters.from ? formatDate(report.filters.from) : "All time";
+  const to = report.filters.to ? formatDate(report.filters.to) : "Today";
+  const properties = report.tables.properties
+    .slice(0, 16)
+    .map(
+      (property) => `
+      <tr>
+        <td>${escapeHtml(property.name || property.code || "N/A")}</td>
+        <td>${escapeHtml([property.city, property.state].filter(Boolean).join(", ") || "N/A")}</td>
+        <td>${escapeHtml(property.tenants)}</td>
+        <td>${escapeHtml(formatMoney(property.monthlyRent))}</td>
+        <td>${escapeHtml(formatMoney(property.paid))}</td>
+      </tr>`
+    )
+    .join("");
+  const payments = report.tables.payments
+    .slice(0, 24)
+    .map(
+      (payment) => `
+      <tr>
+        <td>${escapeHtml(formatDate(String(payment.date || "")))}</td>
+        <td>${escapeHtml(payment.tenant || "N/A")}</td>
+        <td>${escapeHtml(payment.property || "N/A")}</td>
+        <td>${escapeHtml(formatMoney(payment.amount))}</td>
+        <td><span class="status">${escapeHtml(payment.status)}</span></td>
+      </tr>`
+    )
+    .join("");
+
+  return `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${escapeHtml(company)} Portfolio Report</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #eef3f8; color: #0f172a; font-family: Arial, sans-serif; }
+    .page { max-width: 1040px; margin: 32px auto; background: white; border: 1px solid #dbe4ef; border-radius: 28px; overflow: hidden; box-shadow: 0 24px 70px rgba(15,23,42,.12); }
+    .header { background: #0f172a; color: white; padding: 34px; display: flex; justify-content: space-between; gap: 28px; }
+    .logo { height: 58px; max-width: 190px; object-fit: contain; background: white; border-radius: 16px; padding: 8px; margin-bottom: 18px; }
+    .mark { height: 58px; width: 58px; display: grid; place-items: center; background: #2563eb; border-radius: 18px; font-weight: 900; margin-bottom: 18px; }
+    .eyebrow { margin: 0; color: #93c5fd; font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+    h1 { margin: 10px 0 0; font-size: 36px; line-height: 1.05; }
+    .meta { color: #cbd5e1; font-size: 13px; text-align: right; line-height: 1.7; }
+    .body { padding: 34px; }
+    .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+    .metric { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 18px; padding: 18px; }
+    .metric span { display: block; color: #64748b; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+    .metric strong { display: block; margin-top: 10px; font-size: 24px; }
+    .summary { margin-top: 28px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 20px; padding: 22px; color: #475569; line-height: 1.65; }
+    h2 { margin: 32px 0 14px; font-size: 22px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { text-align: left; color: #64748b; text-transform: uppercase; letter-spacing: .05em; font-size: 11px; border-bottom: 1px solid #e2e8f0; padding: 11px 8px; }
+    td { border-bottom: 1px solid #edf2f7; padding: 13px 8px; color: #1e293b; }
+    .status { display: inline-block; border-radius: 999px; background: #dbeafe; color: #1d4ed8; padding: 4px 9px; font-size: 11px; font-weight: 800; }
+    .footer { background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 18px 34px; color: #64748b; font-size: 12px; }
+    @media print { body { background: white; } .page { margin: 0; border-radius: 0; box-shadow: none; border: 0; } }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="header">
+      <div>
+        ${logoUrl ? `<img class="logo" src="${escapeHtml(logoUrl)}" alt="${escapeHtml(company)} logo">` : `<div class="mark">HH</div>`}
+        <p class="eyebrow">Landlord Portfolio Report</p>
+        <h1>${escapeHtml(company)}</h1>
+        <p style="margin: 12px 0 0; color: #cbd5e1;">Reporting period: ${escapeHtml(from)} - ${escapeHtml(to)}</p>
+      </div>
+      <div class="meta">
+        <strong style="color:white;">Generated</strong><br>${escapeHtml(formatDate(report.generatedAt))}<br><br>
+        <strong style="color:white;">Organization</strong><br>${escapeHtml(report.organization?.email || report.settings?.email || "N/A")}<br><br>
+        <strong style="color:white;">Support</strong><br>${escapeHtml(report.settings?.supportEmail || report.settings?.email || "N/A")}
+      </div>
+    </header>
+    <section class="body">
+      <div class="metrics">
+        <div class="metric"><span>Revenue</span><strong>${escapeHtml(formatMoney(report.summary.totalRevenue))}</strong></div>
+        <div class="metric"><span>Pending</span><strong>${escapeHtml(formatMoney(report.summary.pendingRevenue))}</strong></div>
+        <div class="metric"><span>Occupancy</span><strong>${report.summary.occupancyRate}%</strong></div>
+        <div class="metric"><span>Maintenance</span><strong>${report.summary.maintenanceOpen}</strong></div>
+      </div>
+      <div class="summary">
+        This report summarizes ${report.summary.properties} active properties, ${report.summary.tenants} tenants,
+        ${escapeHtml(formatMoney(report.summary.totalRevenue))} approved revenue, and ${report.summary.maintenanceOpen}
+        open maintenance request(s). All data is scoped to the current landlord organization and selected filters.
+      </div>
+      <h2>Property Performance</h2>
+      <table>
+        <thead><tr><th>Property</th><th>Market</th><th>Tenants</th><th>Monthly Rent</th><th>Collected</th></tr></thead>
+        <tbody>${properties || `<tr><td colspan="5">No properties found.</td></tr>`}</tbody>
+      </table>
+      <h2>Payment Activity</h2>
+      <table>
+        <thead><tr><th>Date</th><th>Tenant</th><th>Property</th><th>Amount</th><th>Status</th></tr></thead>
+        <tbody>${payments || `<tr><td colspan="5">No payments found.</td></tr>`}</tbody>
+      </table>
+    </section>
+    <footer class="footer">Generated by The House Hub. Report filters and exported figures are included in the JSON export for auditability.</footer>
+  </main>
+</body>
+</html>`;
 }
 
 export default function ReportsPage() {
@@ -338,14 +471,9 @@ export default function ReportsPage() {
 
   function exportHtml() {
     if (!report) return;
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>The House Hub Report</title></head><body><pre>${JSON.stringify(
-      report,
-      null,
-      2
-    )}</pre></body></html>`;
     downloadFile(
       `the-house-hub-report-${new Date().toISOString().slice(0, 10)}.html`,
-      html,
+      buildReportHtml(report),
       "text/html"
     );
   }
@@ -392,6 +520,8 @@ export default function ReportsPage() {
             {error || success}
           </div>
         )}
+
+        {report && <ReportLetterhead report={report} />}
 
         <section className="rounded-[32px] border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/5">
           <div className="mb-5 flex items-center gap-3">
@@ -576,6 +706,84 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       </span>
       {children}
     </label>
+  );
+}
+
+function ReportLetterhead({ report }: { report: ReportPayload }) {
+  const company =
+    report.settings?.companyName ||
+    report.organization?.companyName ||
+    report.organization?.name ||
+    "The House Hub";
+  const logoUrl = resolveAssetUrl(report.settings?.logoUrl);
+  const from = report.filters.from ? formatDate(report.filters.from) : "All time";
+  const to = report.filters.to ? formatDate(report.filters.to) : "Today";
+
+  return (
+    <section className="overflow-hidden rounded-[32px] border border-slate-200 bg-slate-950 text-white shadow-sm dark:border-white/10">
+      <div className="grid gap-6 p-6 lg:grid-cols-[1fr_auto] lg:p-8">
+        <div>
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={logoUrl}
+              alt={`${company} logo`}
+              className="mb-5 h-16 max-w-56 rounded-2xl bg-white object-contain p-2"
+            />
+          ) : (
+            <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-600 text-xl font-black">
+              HH
+            </div>
+          )}
+          <p className="text-xs font-black uppercase tracking-[0.22em] text-blue-200">
+            Landlord Portfolio Report
+          </p>
+          <h2 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">
+            {company}
+          </h2>
+          <p className="mt-3 text-sm text-slate-300">
+            Reporting period: {from} - {to}
+          </p>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-3 lg:min-w-[520px]">
+          <LetterheadMeta label="Generated" value={formatDate(report.generatedAt)} />
+          <LetterheadMeta
+            label="Organization"
+            value={report.organization?.email || report.settings?.email || "N/A"}
+          />
+          <LetterheadMeta
+            label="Support"
+            value={report.settings?.supportEmail || report.settings?.email || "N/A"}
+          />
+        </div>
+      </div>
+
+      <div className="grid gap-3 border-t border-white/10 bg-white/5 p-4 sm:grid-cols-4 lg:px-8">
+        <LetterheadMetric label="Approved Revenue" value={formatMoney(report.summary.totalRevenue)} />
+        <LetterheadMetric label="Pending Revenue" value={formatMoney(report.summary.pendingRevenue)} />
+        <LetterheadMetric label="Occupancy" value={`${report.summary.occupancyRate}%`} />
+        <LetterheadMetric label="Open Maintenance" value={String(report.summary.maintenanceOpen)} />
+      </div>
+    </section>
+  );
+}
+
+function LetterheadMeta({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/10 p-4">
+      <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{label}</p>
+      <p className="mt-2 break-words text-sm font-bold text-white">{value}</p>
+    </div>
+  );
+}
+
+function LetterheadMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl bg-white/10 px-4 py-3">
+      <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{label}</p>
+      <p className="mt-2 text-xl font-black text-white">{value}</p>
+    </div>
   );
 }
 
