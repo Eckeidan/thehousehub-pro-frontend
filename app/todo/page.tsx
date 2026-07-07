@@ -90,6 +90,9 @@ export default function AdminTodoPage() {
   const [actionId, setActionId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [successTone, setSuccessTone] = useState<"approved" | "rejected">(
+    "approved"
+  );
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -161,6 +164,7 @@ export default function AdminTodoPage() {
       setActionId(paymentId);
       setError("");
       setSuccess("");
+      setSuccessTone(status === "PAID" ? "approved" : "rejected");
 
       const token = localStorage.getItem("token");
       const res = await fetch(`${API_BASE}/api/payments/${paymentId}`, {
@@ -186,6 +190,7 @@ export default function AdminTodoPage() {
       }
 
       setPayments((current) => current.filter((payment) => payment.id !== paymentId));
+      setSuccessTone(status === "PAID" ? "approved" : "rejected");
       setSuccess(status === "PAID" ? "Payment approved." : "Payment rejected.");
     } catch (err: any) {
       console.error("Payment approval action error:", err);
@@ -224,6 +229,8 @@ export default function AdminTodoPage() {
             className={`rounded-2xl border px-4 py-3 text-sm ${
               error
                 ? "border-rose-200 bg-rose-50 text-rose-700"
+                : successTone === "rejected"
+                ? "border-amber-200 bg-amber-50 text-amber-800"
                 : "border-emerald-200 bg-emerald-50 text-emerald-700"
             }`}
           >
