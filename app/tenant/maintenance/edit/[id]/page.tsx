@@ -122,7 +122,7 @@ export default function TenantMaintenanceEditPage() {
       const currentUser: AuthUser = meData?.user || null;
       setUser(currentUser);
 
-      const requestRes = await fetch(`${API_URL}/api/maintenance/${id}`, {
+      const requestRes = await fetch(`${API_URL}/api/tenant/maintenance/${id}`, {
         headers: {
           Authorization: `Bearer ${token || ""}`,
         },
@@ -180,7 +180,7 @@ export default function TenantMaintenanceEditPage() {
 
       const token = localStorage.getItem("token");
 
-      const res = await fetch(`${API_URL}/api/maintenance/${id}`, {
+      const res = await fetch(`${API_URL}/api/tenant/maintenance/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

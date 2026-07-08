@@ -221,6 +221,7 @@ export default function TenantMaintenancePage() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [requests, setRequests] = useState<MaintenanceRequest[]>([]);
   const [error, setError] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [formError, setFormError] = useState("");
@@ -532,6 +533,16 @@ export default function TenantMaintenancePage() {
 
   const latestRequest = requests.length > 0 ? requests[0] : null;
 
+  const filteredRequests = useMemo(() => {
+    if (statusFilter === "ALL") return requests;
+    if (statusFilter === "ACTIVE") {
+      return requests.filter((request) =>
+        ["OPEN", "IN_PROGRESS", "ON_HOLD"].includes(request.status)
+      );
+    }
+    return requests.filter((request) => request.status === statusFilter);
+  }, [requests, statusFilter]);
+
   if (checkingAuth || loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#f4f7fb]">
@@ -677,18 +688,43 @@ export default function TenantMaintenancePage() {
 
             <section className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-3">
               <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm xl:col-span-2">
-                <h3 className="text-2xl font-semibold text-slate-900">
-                  Request History
-                </h3>
-                <p className="mt-1 text-sm text-slate-500">
-                  View all maintenance requests linked to your tenant account.
-                </p>
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <h3 className="text-2xl font-semibold text-slate-900">
+                      Request History
+                    </h3>
+                    <p className="mt-1 text-sm text-slate-500">
+                      View all maintenance requests linked to your tenant account.
+                    </p>
+                  </div>
+
+                  <select
+                    value={statusFilter}
+                    onChange={(event) => setStatusFilter(event.target.value)}
+                    className="rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  >
+                    <option value="ALL">All requests</option>
+                    <option value="ACTIVE">Active only</option>
+                    <option value="OPEN">Open</option>
+                    <option value="IN_PROGRESS">In progress</option>
+                    <option value="ON_HOLD">On hold</option>
+                    <option value="RESOLVED">Resolved</option>
+                    <option value="CLOSED">Closed</option>
+                    <option value="CANCELLED">Cancelled</option>
+                  </select>
+                </div>
 
                 <div className="mt-6 space-y-4">
-                  {requests.length === 0 ? (
-                    <EmptyState text="No maintenance request has been submitted yet." />
+                  {filteredRequests.length === 0 ? (
+                    <EmptyState
+                      text={
+                        requests.length === 0
+                          ? "No maintenance request has been submitted yet."
+                          : "No request matches this filter."
+                      }
+                    />
                   ) : (
-                    requests.map((item) => (
+                    filteredRequests.map((item) => (
                       <div
                         key={item.id}
                         className="rounded-3xl border border-slate-200 bg-slate-50 p-5 transition hover:border-slate-300 hover:bg-white"
