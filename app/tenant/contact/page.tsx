@@ -50,6 +50,29 @@ type ContactInfo = {
   };
 };
 
+type ThreadMessage = {
+  id: string;
+  subject?: string | null;
+  messageSummary: string;
+  direction: "INBOUND" | "OUTBOUND" | string;
+  senderName?: string | null;
+  receiverName?: string | null;
+  sentAt: string;
+};
+
+function formatMessageTime(value?: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 export default function TenantContactPage() {
   const router = useRouter();
 
@@ -61,6 +84,8 @@ export default function TenantContactPage() {
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
   const [contactInfo, setContactInfo] = useState<ContactInfo | null>(null);
+  const [messages, setMessages] = useState<ThreadMessage[]>([]);
+  const [loadingThread, setLoadingThread] = useState(true);
 
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
@@ -95,27 +120,52 @@ export default function TenantContactPage() {
   useEffect(() => {
     if (!checking) {
       fetchContactInfo();
+      fetchThread();
+
+      const interval = window.setInterval(() => {
+        fetchThread(true);
+      }, 3000);
+
+      return () => window.clearInterval(interval);
     }
   }, [checking]);
 
   async function fetchContactInfo() {
-  try {
-    setLoadingInfo(true);
+    try {
+      setLoadingInfo(true);
 
-    const token = localStorage.getItem("token");
+      const token = localStorage.getItem("token");
 
-    const res = await fetch(`${API_BASE}/api/tenant/contact`, {
-      method: "GET",
-      cache: "no-store",
-      headers: {
-        Authorization: `Bearer ${token || ""}`,
-      },
-    });
+      const res = await fetch(`${API_BASE}/api/tenant/contact`, {
+        method: "GET",
+        cache: "no-store",
+        headers: {
+          Authorization: `Bearer ${token || ""}`,
+        },
+      });
 
-    const data = await res.json().catch(() => null);
+      const data = await res.json().catch(() => null);
 
-    if (!res.ok) {
-      console.warn("Landlord info unavailable:", data);
+      if (!res.ok) {
+        console.warn("Landlord info unavailable:", data);
+
+        setContactInfo({
+          landlord: {
+            fullName: "Property Management",
+            email: "support@thehousehub.app",
+            phone: "Available in property settings",
+            office: "Property management office",
+          },
+          property: {},
+          unit: {},
+        });
+
+        return;
+      }
+
+      setContactInfo(data);
+    } catch (err) {
+      console.warn("Contact info fallback used:", err);
 
       setContactInfo({
         landlord: {
@@ -127,28 +177,48 @@ export default function TenantContactPage() {
         property: {},
         unit: {},
       });
-
-      return;
+    } finally {
+      setLoadingInfo(false);
     }
-
-    setContactInfo(data);
-  } catch (err) {
-    console.warn("Contact info fallback used:", err);
-
-    setContactInfo({
-      landlord: {
-        fullName: "Property Management",
-        email: "support@thehousehub.app",
-        phone: "Available in property settings",
-        office: "Property management office",
-      },
-      property: {},
-      unit: {},
-    });
-  } finally {
-    setLoadingInfo(false);
   }
-}
+
+  async function fetchThread(silent = false) {
+    try {
+      if (!silent) setLoadingThread(true);
+
+      const token = localStorage.getItem("token");
+
+      const res = await fetch(`${API_BASE}/api/tenant/contact/thread`, {
+        method: "GET",
+        cache: "no-store",
+        headers: {
+          Authorization: `Bearer ${token || ""}`,
+        },
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (res.status === 401) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        router.replace("/");
+        return;
+      }
+
+      if (!res.ok) {
+        if (!silent) throw new Error(data?.error || "Failed to load conversation");
+        return;
+      }
+
+      setMessages(Array.isArray(data?.messages) ? data.messages : []);
+    } catch (err: any) {
+      if (!silent) {
+        setError(err?.message || "Failed to load conversation.");
+      }
+    } finally {
+      if (!silent) setLoadingThread(false);
+    }
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -195,9 +265,18 @@ export default function TenantContactPage() {
         throw new Error(data?.error || "Failed to send message");
       }
 
+      if (data?.communication) {
+        setMessages((current) => {
+          const exists = current.some((item) => item.id === data.communication.id);
+          if (exists) return current;
+          return [...current, data.communication];
+        });
+      }
+
       setSuccess("Your message has been sent successfully.");
       setSubject("");
       setMessage("");
+      fetchThread(true);
     } catch (err: any) {
       setError(err?.message || "Failed to send message.");
     } finally {
@@ -293,6 +372,74 @@ export default function TenantContactPage() {
                   {success}
                 </div>
               )}
+
+              <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h4 className="font-bold text-slate-900">Conversation</h4>
+                    <p className="text-xs text-slate-500">
+                      Messages sync automatically while this page is open.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => fetchThread()}
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                  >
+                    Refresh
+                  </button>
+                </div>
+
+                <div className="mt-4 max-h-[420px] space-y-3 overflow-y-auto pr-1">
+                  {loadingThread ? (
+                    <div className="flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-8 text-sm text-slate-500">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading conversation...
+                    </div>
+                  ) : messages.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-8 text-center">
+                      <MessageCircle className="mx-auto h-10 w-10 text-slate-300" />
+                      <p className="mt-3 text-sm font-semibold text-slate-800">
+                        No messages yet
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Send the first message to your property management team.
+                      </p>
+                    </div>
+                  ) : (
+                    messages.map((item) => {
+                      const isTenant = item.direction === "INBOUND";
+
+                      return (
+                        <div
+                          key={item.id}
+                          className={`flex ${isTenant ? "justify-end" : "justify-start"}`}
+                        >
+                          <div
+                            className={`max-w-[86%] rounded-3xl px-4 py-3 text-sm shadow-sm ${
+                              isTenant
+                                ? "bg-blue-700 text-white"
+                                : "bg-white text-slate-800 ring-1 ring-slate-200"
+                            }`}
+                          >
+                            <p className="whitespace-pre-wrap break-words leading-6">
+                              {item.messageSummary}
+                            </p>
+                            <p
+                              className={`mt-2 text-[11px] ${
+                                isTenant ? "text-blue-100" : "text-slate-400"
+                              }`}
+                            >
+                              {item.senderName || (isTenant ? "You" : "Management")} ·{" "}
+                              {formatMessageTime(item.sentAt)}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
 
               <form onSubmit={handleSubmit} className="mt-6 space-y-5">
                 <div>

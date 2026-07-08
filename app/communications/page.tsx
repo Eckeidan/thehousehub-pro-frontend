@@ -125,10 +125,24 @@ export default function AdminCommunicationsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checkingAuth]);
 
-  async function fetchInbox() {
+  useEffect(() => {
+    if (checkingAuth) return;
+
+    const interval = window.setInterval(() => {
+      fetchInbox({ silent: true });
+      if (selectedTenantId) {
+        openThread(selectedTenantId, { silent: true });
+      }
+    }, 3000);
+
+    return () => window.clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkingAuth, selectedTenantId]);
+
+  async function fetchInbox(options: { silent?: boolean } = {}) {
     try {
-      setLoadingInbox(true);
-      setError("");
+      if (!options.silent) setLoadingInbox(true);
+      if (!options.silent) setError("");
 
       const token = localStorage.getItem("token");
 
@@ -161,21 +175,28 @@ export default function AdminCommunicationsPage() {
       const firstTenantId = rows.find((m: InboxMessage) => m.tenantId)?.tenantId;
 
       if (!selectedTenantId && firstTenantId) {
-        openThread(firstTenantId);
+        openThread(firstTenantId, { silent: options.silent });
       }
     } catch (err: any) {
-      setError(err?.message || "Failed to load inbox.");
+      if (!options.silent) {
+        setError(err?.message || "Failed to load inbox.");
+      }
     } finally {
-      setLoadingInbox(false);
+      if (!options.silent) setLoadingInbox(false);
     }
   }
 
-  async function openThread(tenantId: string) {
+  async function openThread(
+    tenantId: string,
+    options: { silent?: boolean } = {}
+  ) {
     try {
       setSelectedTenantId(tenantId);
-      setLoadingThread(true);
-      setError("");
-      setSuccess("");
+      if (!options.silent) {
+        setLoadingThread(true);
+        setError("");
+        setSuccess("");
+      }
 
       const token = localStorage.getItem("token");
 
@@ -209,9 +230,11 @@ export default function AdminCommunicationsPage() {
         messages: Array.isArray(data.messages) ? data.messages : [],
       });
     } catch (err: any) {
-      setError(err?.message || "Failed to load conversation.");
+      if (!options.silent) {
+        setError(err?.message || "Failed to load conversation.");
+      }
     } finally {
-      setLoadingThread(false);
+      if (!options.silent) setLoadingThread(false);
     }
   }
 
@@ -263,10 +286,25 @@ export default function AdminCommunicationsPage() {
         throw new Error(data?.error || "Failed to send reply");
       }
 
+      if (data?.communication) {
+        setThread((current) =>
+          current
+            ? {
+                ...current,
+                messages: current.messages.some(
+                  (item) => item.id === data.communication.id
+                )
+                  ? current.messages
+                  : [...current.messages, data.communication],
+              }
+            : current
+        );
+      }
+
       setReply("");
       setSuccess("Reply sent successfully.");
-      await openThread(selectedTenantId);
-      await fetchInbox();
+      await openThread(selectedTenantId, { silent: true });
+      await fetchInbox({ silent: true });
     } catch (err: any) {
       setError(err?.message || "Failed to send reply.");
     } finally {
@@ -321,7 +359,7 @@ export default function AdminCommunicationsPage() {
       subtitle="Inbox, conversation thread, and admin replies."
       actions={
         <button
-          onClick={fetchInbox}
+          onClick={() => fetchInbox()}
           className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
         >
           <RefreshCw className="h-4 w-4" />
