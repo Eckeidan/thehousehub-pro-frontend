@@ -17,7 +17,12 @@ import {
   Mail,
   Phone,
   MapPin,
+  Paperclip,
+  X,
 } from "lucide-react";
+import MessageAttachments, {
+  type MessageAttachment,
+} from "@/components/MessageAttachments";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
@@ -58,6 +63,7 @@ type ThreadMessage = {
   senderName?: string | null;
   receiverName?: string | null;
   sentAt: string;
+  attachments?: MessageAttachment[] | null;
 };
 
 function formatMessageTime(value?: string | null) {
@@ -87,8 +93,8 @@ export default function TenantContactPage() {
   const [messages, setMessages] = useState<ThreadMessage[]>([]);
   const [loadingThread, setLoadingThread] = useState(true);
 
-  const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -225,13 +231,8 @@ export default function TenantContactPage() {
     setError("");
     setSuccess("");
 
-    if (!subject.trim()) {
-      setError("Please enter a subject.");
-      return;
-    }
-
-    if (!message.trim()) {
-      setError("Please enter your message.");
+    if (!message.trim() && selectedFiles.length === 0) {
+      setError("Please write a message or attach a file.");
       return;
     }
 
@@ -239,17 +240,16 @@ export default function TenantContactPage() {
       setLoading(true);
 
       const token = localStorage.getItem("token");
+      const formData = new FormData();
+      formData.append("message", message.trim());
+      selectedFiles.forEach((file) => formData.append("attachments", file));
 
       const res = await fetch(`${API_BASE}/api/tenant/contact`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
           Authorization: `Bearer ${token || ""}`,
         },
-        body: JSON.stringify({
-          subject: subject.trim(),
-          message: message.trim(),
-        }),
+        body: formData,
       });
 
       const data = await res.json().catch(() => null);
@@ -274,8 +274,8 @@ export default function TenantContactPage() {
       }
 
       setSuccess("Your message has been sent successfully.");
-      setSubject("");
       setMessage("");
+      setSelectedFiles([]);
       fetchThread(true);
     } catch (err: any) {
       setError(err?.message || "Failed to send message.");
@@ -288,6 +288,15 @@ export default function TenantContactPage() {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     router.replace("/");
+  }
+
+  function handleAttachmentChange(files: FileList | null) {
+    if (!files) return;
+
+    const incoming = Array.from(files);
+    const combined = [...selectedFiles, ...incoming].slice(0, 5);
+    setSelectedFiles(combined);
+    setError("");
   }
 
   if (checking) {
@@ -356,9 +365,9 @@ export default function TenantContactPage() {
 
           <div className="grid gap-6 p-6 md:grid-cols-3 md:p-8">
             <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200 md:col-span-2">
-              <h3 className="text-xl font-bold">Send Message</h3>
+              <h3 className="text-xl font-bold">Conversation</h3>
               <p className="mt-1 text-sm text-slate-500">
-                Your message will be saved in the communication history for the property management team.
+                Chat directly with your property management team.
               </p>
 
               {error && (
@@ -425,6 +434,10 @@ export default function TenantContactPage() {
                             <p className="whitespace-pre-wrap break-words leading-6">
                               {item.messageSummary}
                             </p>
+                            <MessageAttachments
+                              attachments={item.attachments}
+                              align={isTenant ? "right" : "left"}
+                            />
                             <p
                               className={`mt-2 text-[11px] ${
                                 isTenant ? "text-blue-100" : "text-slate-400"
@@ -441,44 +454,68 @@ export default function TenantContactPage() {
                 </div>
               </div>
 
-              <form onSubmit={handleSubmit} className="mt-6 space-y-5">
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">
-                    Subject
-                  </label>
-                  <input
-                    value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
-                    placeholder="Example: Question about my payment"
-                    className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                  />
-                </div>
+              <form onSubmit={handleSubmit} className="mt-6">
+                {selectedFiles.length > 0 && (
+                  <div className="mb-3 flex flex-wrap gap-2">
+                    {selectedFiles.map((file, index) => (
+                      <span
+                        key={`${file.name}-${index}`}
+                        className="inline-flex max-w-full items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600"
+                      >
+                        <span className="max-w-[220px] truncate">{file.name}</span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSelectedFiles((current) =>
+                              current.filter((_, fileIndex) => fileIndex !== index)
+                            )
+                          }
+                          className="rounded-full p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
+                          aria-label="Remove attachment"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
 
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">
-                    Message
+                <div className="flex items-end gap-3 rounded-3xl border border-slate-300 bg-white p-3 shadow-sm focus-within:border-blue-500 focus-within:ring-4 focus-within:ring-blue-100">
+                  <label className="inline-flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-2xl bg-slate-100 text-slate-600 transition hover:bg-slate-200">
+                    <Paperclip className="h-5 w-5" />
+                    <input
+                      type="file"
+                      multiple
+                      className="hidden"
+                      accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
+                      onChange={(event) => {
+                        handleAttachmentChange(event.target.files);
+                        event.target.value = "";
+                      }}
+                    />
                   </label>
+
                   <textarea
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
-                    rows={7}
-                    placeholder="Write your message here..."
-                    className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                    rows={2}
+                    placeholder="Type a message..."
+                    className="max-h-36 min-h-11 flex-1 resize-none border-0 bg-transparent px-1 py-2 text-sm outline-none"
                   />
-                </div>
 
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="inline-flex items-center gap-2 rounded-2xl bg-blue-700 px-6 py-3 font-semibold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {loading ? (
-                    <Loader2 className="animate-spin" size={18} />
-                  ) : (
-                    <Send size={18} />
-                  )}
-                  {loading ? "Sending..." : "Send Message"}
-                </button>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-700 text-white shadow-lg shadow-blue-200 transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    aria-label="Send message"
+                  >
+                    {loading ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <Send className="h-5 w-5" />
+                    )}
+                  </button>
+                </div>
               </form>
             </section>
 

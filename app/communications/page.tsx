@@ -11,8 +11,13 @@ import {
   Building,
   Home,
   RefreshCw,
+  Paperclip,
+  X,
 } from "lucide-react";
 import AdminShell from "@/components/AdminShell";
+import MessageAttachments, {
+  type MessageAttachment,
+} from "@/components/MessageAttachments";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
@@ -30,8 +35,9 @@ type InboxMessage = {
   subject?: string | null;
   messageSummary: string;
   direction: string;
-  sentAt: string;
+  sentAt?: string;
   senderName?: string | null;
+  attachments?: MessageAttachment[] | null;
   tenant?: {
     id: string;
     fullName?: string | null;
@@ -44,6 +50,20 @@ type InboxMessage = {
   } | null;
 };
 
+type TenantDirectoryItem = {
+  id: string;
+  tenantId: string;
+  fullName?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  property?: {
+    id?: string;
+    name?: string | null;
+    addressLine1?: string | null;
+  } | null;
+  lastMessage?: ThreadMessage | null;
+};
+
 type ThreadMessage = {
   id: string;
   subject?: string | null;
@@ -52,6 +72,7 @@ type ThreadMessage = {
   senderName?: string | null;
   receiverName?: string | null;
   sentAt: string;
+  attachments?: MessageAttachment[] | null;
 };
 
 type ThreadData = {
@@ -74,6 +95,50 @@ type ThreadData = {
   messages: ThreadMessage[];
 };
 
+function mergeConversationRows(
+  messages: InboxMessage[],
+  tenants: TenantDirectoryItem[]
+) {
+  const byTenant = new Map<string, InboxMessage>();
+
+  for (const message of messages) {
+    if (!message.tenantId || byTenant.has(message.tenantId)) continue;
+    byTenant.set(message.tenantId, message);
+  }
+
+  for (const tenant of tenants) {
+    if (!tenant.tenantId || byTenant.has(tenant.tenantId)) continue;
+
+    byTenant.set(tenant.tenantId, {
+      id: `tenant-${tenant.tenantId}`,
+      tenantId: tenant.tenantId,
+      messageSummary: tenant.lastMessage?.messageSummary || "Start a conversation",
+      direction: tenant.lastMessage?.direction || "INTERNAL",
+      sentAt: tenant.lastMessage?.sentAt,
+      senderName: tenant.fullName || tenant.email || "Tenant",
+      attachments: tenant.lastMessage?.attachments || [],
+      tenant: {
+        id: tenant.tenantId,
+        fullName: tenant.fullName || tenant.email || "Tenant",
+        email: tenant.email,
+      },
+      property: tenant.property
+        ? {
+            id: tenant.property.id || tenant.tenantId,
+            name: tenant.property.name,
+            addressLine1: tenant.property.addressLine1,
+          }
+        : null,
+    });
+  }
+
+  return Array.from(byTenant.values()).sort((a, b) => {
+    const dateA = a.sentAt ? new Date(a.sentAt).getTime() : 0;
+    const dateB = b.sentAt ? new Date(b.sentAt).getTime() : 0;
+    return dateB - dateA;
+  });
+}
+
 export default function AdminCommunicationsPage() {
   const router = useRouter();
 
@@ -90,6 +155,7 @@ export default function AdminCommunicationsPage() {
 
   const [query, setQuery] = useState("");
   const [reply, setReply] = useState("");
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -146,33 +212,52 @@ export default function AdminCommunicationsPage() {
 
       const token = localStorage.getItem("token");
 
-      const res = await fetch(`${API_BASE}/api/communications`, {
-        cache: "no-store",
-        headers: {
-          Authorization: `Bearer ${token || ""}`,
-        },
-      });
+      const [inboxRes, tenantsRes] = await Promise.all([
+        fetch(`${API_BASE}/api/communications`, {
+          cache: "no-store",
+          headers: {
+            Authorization: `Bearer ${token || ""}`,
+          },
+        }),
+        fetch(`${API_BASE}/api/communications/tenants`, {
+          cache: "no-store",
+          headers: {
+            Authorization: `Bearer ${token || ""}`,
+          },
+        }),
+      ]);
 
-      const data = await res.json().catch(() => null);
+      const [inboxData, tenantsData] = await Promise.all([
+        inboxRes.json().catch(() => null),
+        tenantsRes.json().catch(() => null),
+      ]);
 
-      if (res.status === 401) {
+      if (inboxRes.status === 401 || tenantsRes.status === 401) {
         localStorage.removeItem("token");
         localStorage.removeItem("user");
         router.replace("/");
         return;
       }
 
-      if (!res.ok) {
-        throw new Error(data?.error || "Failed to load inbox");
+      if (!inboxRes.ok) {
+        throw new Error(inboxData?.error || "Failed to load inbox");
       }
 
-      const rows = Array.isArray(data?.communications)
-        ? data.communications
+      if (!tenantsRes.ok) {
+        throw new Error(tenantsData?.error || "Failed to load tenants");
+      }
+
+      const rows = Array.isArray(inboxData?.communications)
+        ? inboxData.communications
         : [];
+      const tenants = Array.isArray(tenantsData?.tenants)
+        ? tenantsData.tenants
+        : [];
+      const merged = mergeConversationRows(rows, tenants);
 
-      setInbox(rows);
+      setInbox(merged);
 
-      const firstTenantId = rows.find((m: InboxMessage) => m.tenantId)?.tenantId;
+      const firstTenantId = merged.find((m: InboxMessage) => m.tenantId)?.tenantId;
 
       if (!selectedTenantId && firstTenantId) {
         openThread(firstTenantId, { silent: options.silent });
@@ -248,8 +333,8 @@ export default function AdminCommunicationsPage() {
       return;
     }
 
-    if (!reply.trim()) {
-      setError("Please write a reply.");
+    if (!reply.trim() && selectedFiles.length === 0) {
+      setError("Please write a reply or attach a file.");
       return;
     }
 
@@ -257,19 +342,18 @@ export default function AdminCommunicationsPage() {
       setSending(true);
 
       const token = localStorage.getItem("token");
+      const formData = new FormData();
+      formData.append("message", reply.trim());
+      selectedFiles.forEach((file) => formData.append("attachments", file));
 
       const res = await fetch(
         `${API_BASE}/api/communications/thread/${selectedTenantId}/reply`,
         {
           method: "POST",
           headers: {
-            "Content-Type": "application/json",
             Authorization: `Bearer ${token || ""}`,
           },
-          body: JSON.stringify({
-            message: reply.trim(),
-            subject: thread?.messages?.[0]?.subject || "Management reply",
-          }),
+          body: formData,
         }
       );
 
@@ -302,6 +386,7 @@ export default function AdminCommunicationsPage() {
       }
 
       setReply("");
+      setSelectedFiles([]);
       setSuccess("Reply sent successfully.");
       await openThread(selectedTenantId, { silent: true });
       await fetchInbox({ silent: true });
@@ -310,6 +395,15 @@ export default function AdminCommunicationsPage() {
     } finally {
       setSending(false);
     }
+  }
+
+  function handleAttachmentChange(files: FileList | null) {
+    if (!files) return;
+
+    const incoming = Array.from(files);
+    const combined = [...selectedFiles, ...incoming].slice(0, 5);
+    setSelectedFiles(combined);
+    setError("");
   }
 
   const conversations = useMemo(() => {
@@ -439,7 +533,9 @@ export default function AdminCommunicationsPage() {
                                 "Unknown tenant"}
                             </p>
                             <span className="shrink-0 text-[11px] text-slate-400">
-                              {new Date(item.sentAt).toLocaleDateString()}
+                              {item.sentAt
+                                ? new Date(item.sentAt).toLocaleDateString()
+                                : "New"}
                             </span>
                           </div>
 
@@ -450,7 +546,11 @@ export default function AdminCommunicationsPage() {
                           </p>
 
                           <p className="mt-1 truncate text-sm text-slate-600">
-                            {item.direction === "OUTBOUND" ? "You: " : ""}
+                            {item.direction === "OUTBOUND"
+                              ? "You: "
+                              : item.direction === "INTERNAL"
+                              ? ""
+                              : ""}
                             {item.messageSummary}
                           </p>
                         </div>
@@ -536,6 +636,10 @@ export default function AdminCommunicationsPage() {
                             <p className="whitespace-pre-wrap text-sm leading-6">
                               {msg.messageSummary}
                             </p>
+                            <MessageAttachments
+                              attachments={msg.attachments}
+                              align={isAdmin ? "right" : "left"}
+                            />
                             <p
                               className={`mt-2 text-[11px] ${
                                 isAdmin ? "text-blue-100" : "text-slate-400"
@@ -556,12 +660,56 @@ export default function AdminCommunicationsPage() {
                   onSubmit={sendReply}
                   className="border-t border-slate-200 bg-white p-4"
                 >
+                  {selectedFiles.length > 0 && (
+                    <div className="mb-3 flex flex-wrap gap-2">
+                      {selectedFiles.map((file, index) => (
+                        <span
+                          key={`${file.name}-${index}`}
+                          className="inline-flex max-w-full items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600"
+                        >
+                          <span className="max-w-[220px] truncate">
+                            {file.name}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSelectedFiles((current) =>
+                                current.filter(
+                                  (_, fileIndex) => fileIndex !== index
+                                )
+                              )
+                            }
+                            className="rounded-full p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
+                            aria-label="Remove attachment"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
                   <div className="flex flex-col gap-3 sm:flex-row">
+                    <label className="inline-flex h-[52px] w-full cursor-pointer items-center justify-center gap-2 rounded-2xl bg-slate-100 px-4 text-sm font-semibold text-slate-600 transition hover:bg-slate-200 sm:w-14 sm:px-0">
+                      <Paperclip className="h-5 w-5" />
+                      <span className="sm:hidden">Attach</span>
+                      <input
+                        type="file"
+                        multiple
+                        className="hidden"
+                        accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
+                        onChange={(event) => {
+                          handleAttachmentChange(event.target.files);
+                          event.target.value = "";
+                        }}
+                      />
+                    </label>
+
                     <textarea
                       value={reply}
                       onChange={(e) => setReply(e.target.value)}
                       rows={2}
-                      placeholder="Write a reply to the tenant..."
+                      placeholder="Type a message..."
                       className="min-h-[52px] flex-1 resize-none rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
                     />
 
