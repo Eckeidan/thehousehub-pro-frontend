@@ -211,6 +211,116 @@ function getStatusIcon(status?: string | null) {
   }
 }
 
+function detectMaintenanceClassification(title: string, description: string) {
+  const text = `${title} ${description}`.toLowerCase();
+
+  const hasAny = (keywords: string[]) =>
+    keywords.some((keyword) => text.includes(keyword));
+
+  let category = "GENERAL";
+
+  if (
+    hasAny([
+      "water",
+      "leak",
+      "leaking",
+      "pipe",
+      "plumbing",
+      "toilet",
+      "sink",
+      "drain",
+      "faucet",
+      "shower",
+      "bathroom",
+      "sewer",
+      "flood",
+    ])
+  ) {
+    category = "PLUMBING";
+  } else if (
+    hasAny([
+      "electric",
+      "electrical",
+      "power",
+      "outlet",
+      "socket",
+      "breaker",
+      "light",
+      "spark",
+      "wire",
+      "wiring",
+    ])
+  ) {
+    category = "ELECTRICAL";
+  } else if (
+    hasAny(["heat", "heating", "ac", "a/c", "air conditioning", "hvac", "furnace", "thermostat"])
+  ) {
+    category = "HVAC";
+  } else if (hasAny(["lock", "key", "door won't lock", "locked out", "deadbolt"])) {
+    category = "LOCKS";
+  } else if (hasAny(["paint", "wall", "ceiling", "drywall", "mold", "stain"])) {
+    category = "PAINTING";
+  } else if (hasAny(["pest", "bug", "insect", "roach", "cockroach", "mouse", "mice", "rat"])) {
+    category = "PEST_CONTROL";
+  } else if (
+    hasAny([
+      "fridge",
+      "refrigerator",
+      "oven",
+      "stove",
+      "dishwasher",
+      "washer",
+      "dryer",
+      "appliance",
+    ])
+  ) {
+    category = "APPLIANCE";
+  }
+
+  let priority = "MEDIUM";
+
+  if (
+    hasAny([
+      "fire",
+      "smoke",
+      "spark",
+      "gas",
+      "flood",
+      "flooding",
+      "sewage",
+      "no heat",
+      "no heating",
+      "no power",
+      "electrical shock",
+      "can't lock",
+      "cannot lock",
+      "door won't lock",
+      "emergency",
+    ])
+  ) {
+    priority = "URGENT";
+  } else if (
+    hasAny([
+      "water",
+      "leak",
+      "leaking",
+      "broken",
+      "not working",
+      "mold",
+      "no hot water",
+      "toilet clogged",
+      "clogged toilet",
+      "high",
+    ])
+  ) {
+    priority = "HIGH";
+  } else if (hasAny(["minor", "small", "low", "paint", "scratch"])) {
+    priority = "LOW";
+  }
+
+  return { category, priority };
+}
+
 export default function TenantMaintenancePage() {
   const router = useRouter();
 
@@ -226,6 +336,7 @@ export default function TenantMaintenancePage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [formError, setFormError] = useState("");
   const [selectedPhotos, setSelectedPhotos] = useState<File[]>([]);
+  const [autoClassification, setAutoClassification] = useState(true);
 
   const [uploadWarning, setUploadWarning] = useState("");
 
@@ -367,7 +478,41 @@ export default function TenantMaintenancePage() {
       locationNote: "",
     });
     setSelectedPhotos([]);
+    setAutoClassification(true);
     setFormError("");
+  }
+
+  function updateIssueText(field: "title" | "description", value: string) {
+    setForm((prev) => {
+      const next = { ...prev, [field]: value };
+
+      if (!autoClassification) return next;
+
+      const detected = detectMaintenanceClassification(
+        next.title,
+        next.description
+      );
+
+      return {
+        ...next,
+        category: detected.category,
+        priority: detected.priority,
+      };
+    });
+  }
+
+  function applyAutoClassification() {
+    const detected = detectMaintenanceClassification(
+      form.title,
+      form.description
+    );
+
+    setForm((prev) => ({
+      ...prev,
+      category: detected.category,
+      priority: detected.priority,
+    }));
+    setAutoClassification(true);
   }
 
   function handlePhotoChange(files: FileList | null) {
@@ -940,9 +1085,7 @@ export default function TenantMaintenancePage() {
                 <input
                   type="text"
                   value={form.title}
-                  onChange={(e) =>
-                    setForm((prev) => ({ ...prev, title: e.target.value }))
-                  }
+                  onChange={(e) => updateIssueText("title", e.target.value)}
                   placeholder="Example: Water leaking in bathroom"
                   className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 />
@@ -956,14 +1099,33 @@ export default function TenantMaintenancePage() {
                   rows={4}
                   value={form.description}
                   onChange={(e) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      description: e.target.value,
-                    }))
+                    updateIssueText("description", e.target.value)
                   }
                   placeholder="Describe the issue..."
                   className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 />
+              </div>
+
+              <div className="rounded-3xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p className="font-semibold">
+                      Smart detection {autoClassification ? "is active" : "was manually adjusted"}
+                    </p>
+                    <p className="mt-1 text-blue-700">
+                      Suggested: {form.category.replaceAll("_", " ")} · {form.priority}
+                    </p>
+                  </div>
+                  {!autoClassification && (
+                    <button
+                      type="button"
+                      onClick={applyAutoClassification}
+                      className="rounded-2xl border border-blue-200 bg-white px-4 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100"
+                    >
+                      Detect again
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
@@ -973,12 +1135,13 @@ export default function TenantMaintenancePage() {
                   </label>
                   <select
                     value={form.category}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      setAutoClassification(false);
                       setForm((prev) => ({
                         ...prev,
                         category: e.target.value,
-                      }))
-                    }
+                      }));
+                    }}
                     className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                   >
                     <option value="GENERAL">General</option>
@@ -999,12 +1162,13 @@ export default function TenantMaintenancePage() {
                   </label>
                   <select
                     value={form.priority}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      setAutoClassification(false);
                       setForm((prev) => ({
                         ...prev,
                         priority: e.target.value,
-                      }))
-                    }
+                      }));
+                    }}
                     className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                   >
                     <option value="LOW">Low</option>
