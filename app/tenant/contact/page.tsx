@@ -2,16 +2,8 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import {
-  Home,
-  Wallet,
-  Wrench,
-  FileText,
-  Bell,
   MessageCircle,
-  Settings,
-  LogOut,
   Send,
   Loader2,
   Mail,
@@ -19,10 +11,12 @@ import {
   MapPin,
   Paperclip,
   X,
+  Menu,
 } from "lucide-react";
 import MessageAttachments, {
   type MessageAttachment,
 } from "@/components/MessageAttachments";
+import TenantSidebar from "@/components/TenantSidebar";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
@@ -92,6 +86,7 @@ export default function TenantContactPage() {
   const [contactInfo, setContactInfo] = useState<ContactInfo | null>(null);
   const [messages, setMessages] = useState<ThreadMessage[]>([]);
   const [loadingThread, setLoadingThread] = useState(true);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const [message, setMessage] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -216,13 +211,35 @@ export default function TenantContactPage() {
         return;
       }
 
-      setMessages(Array.isArray(data?.messages) ? data.messages : []);
+      const nextMessages: ThreadMessage[] = Array.isArray(data?.messages)
+        ? data.messages
+        : [];
+      setMessages(nextMessages);
+
+      if (nextMessages.some((item) => item.direction === "OUTBOUND")) {
+        void markConversationRead();
+      }
     } catch (err: any) {
       if (!silent) {
         setError(err?.message || "Failed to load conversation.");
       }
     } finally {
       if (!silent) setLoadingThread(false);
+    }
+  }
+
+  async function markConversationRead() {
+    try {
+      const token = localStorage.getItem("token");
+
+      await fetch(`${API_BASE}/api/tenant/contact/read`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token || ""}`,
+        },
+      });
+    } catch (err) {
+      console.warn("Unable to mark conversation as read:", err);
     }
   }
 
@@ -312,45 +329,54 @@ export default function TenantContactPage() {
   const landlord = contactInfo?.landlord;
   const property = contactInfo?.property;
   const unit = contactInfo?.unit;
+  const fullName = user?.fullName || user?.name || "Tenant";
+  const email = user?.email || "Tenant";
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900">
       <div className="flex min-h-screen">
-        <aside className="fixed inset-y-0 left-0 hidden w-72 bg-gradient-to-b from-blue-950 via-blue-900 to-slate-900 text-white lg:flex lg:flex-col">
-          <div className="border-b border-white/10 px-6 py-7">
-            <h1 className="text-3xl font-bold">The House Hub</h1>
-            <p className="mt-2 text-sm text-blue-100/70">Tenant Portal</p>
+        {mobileMenuOpen && (
+          <div className="fixed inset-0 z-50 lg:hidden">
+            <div
+              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+              onClick={() => setMobileMenuOpen(false)}
+            />
+
+            <aside className="absolute left-0 top-0 flex h-full w-80 max-w-[85vw] flex-col justify-between bg-gradient-to-b from-[#102a67] via-[#173d8e] to-[#0f1f45] text-white shadow-2xl">
+              <TenantSidebar
+                fullName={fullName}
+                email={email}
+                onLogout={logout}
+                onClose={() => setMobileMenuOpen(false)}
+                mobile
+              />
+            </aside>
           </div>
+        )}
 
-          <nav className="flex-1 px-4 py-6">
-            <div className="space-y-2">
-              <TenantNav label="Overview" href="/tenant" icon={<Home size={18} />} />
-              <TenantNav label="Payments" href="/tenant/payments" icon={<Wallet size={18} />} />
-              <TenantNav label="Maintenance" href="/tenant/maintenance" icon={<Wrench size={18} />} />
-              <TenantNav label="Documents" href="/tenant/documents" icon={<FileText size={18} />} />
-              <TenantNav label="Notifications" href="/tenant/notifications" icon={<Bell size={18} />} />
-              <TenantNav label="Contact Landlord" href="/tenant/contact" icon={<MessageCircle size={18} />} active />
-              <TenantNav label="Settings" href="/tenant/settings" icon={<Settings size={18} />} />
-            </div>
-          </nav>
-
-          <div className="border-t border-white/10 px-6 py-5">
-            <p className="text-sm font-semibold">
-              {user?.fullName || user?.name || "Tenant"}
-            </p>
-            <p className="text-xs text-blue-100/70">{user?.email}</p>
-
-            <button
-              onClick={logout}
-              className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm text-red-200 hover:bg-red-500/20"
-            >
-              <LogOut size={16} />
-              Logout
-            </button>
-          </div>
+        <aside className="fixed inset-y-0 left-0 z-40 hidden w-80 shrink-0 flex-col justify-between bg-gradient-to-b from-[#102a67] via-[#173d8e] to-[#0f1f45] text-white shadow-2xl lg:flex">
+          <TenantSidebar fullName={fullName} email={email} onLogout={logout} />
         </aside>
 
-        <main className="flex-1 lg:ml-72">
+        <main className="min-h-screen flex-1 lg:ml-80">
+          <div className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-200 bg-white/90 px-4 py-4 backdrop-blur lg:hidden">
+            <div>
+              <p className="text-sm font-semibold text-slate-900">
+                The House Hub
+              </p>
+              <p className="text-xs text-slate-500">Tenant Workspace</p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(true)}
+              className="rounded-2xl border border-slate-200 bg-white p-3 text-slate-700 shadow-sm"
+              aria-label="Open tenant menu"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+          </div>
+
           <header className="border-b border-slate-200 bg-white px-6 py-6 md:px-8">
             <div>
               <span className="inline-flex rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-blue-700">
@@ -600,32 +626,5 @@ export default function TenantContactPage() {
         </main>
       </div>
     </div>
-  );
-}
-
-function TenantNav({
-  label,
-  href,
-  icon,
-  active = false,
-}: {
-  label: string;
-  href: string;
-  icon: React.ReactNode;
-  active?: boolean;
-}) {
-  return (
-    <Link href={href}>
-      <div
-        className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition ${
-          active
-            ? "bg-white/15 text-white"
-            : "text-blue-100/80 hover:bg-white/10 hover:text-white"
-        }`}
-      >
-        {icon}
-        {label}
-      </div>
-    </Link>
   );
 }

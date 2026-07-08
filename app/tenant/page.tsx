@@ -13,12 +13,9 @@ import {
   YAxis,
 } from "recharts";
 import {
-  Home,
   CreditCard,
   Wrench,
   FileText,
-  Bell,
-  LogOut,
   UserCircle2,
   MessageCircle,
   MapPin,
@@ -26,7 +23,6 @@ import {
   BadgeCheck,
   Wallet,
   ArrowRight,
-  Settings,
   Loader2,
   Building2,
   Phone,
@@ -35,7 +31,6 @@ import {
   ShieldCheck,
   Layers3,
   Menu,
-  X,
   Lock,
   Bot,
   Send,
@@ -44,6 +39,7 @@ import {
   TimerReset,
 } from "lucide-react";
 import TenantAIWidget from "@/components/TenantAIWidget";
+import TenantSidebar from "@/components/TenantSidebar";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
@@ -133,6 +129,16 @@ type TenantDocument = {
   } | null;
 };
 
+type MessageUnreadSummary = {
+  unreadCount: number;
+  latestMessage?: {
+    id: string;
+    title: string;
+    message: string;
+    createdAt: string;
+  } | null;
+};
+
 function formatMoney(value?: string | number | null) {
   if (value === null || value === undefined || value === "") return "$0";
   const num = Number(value);
@@ -175,17 +181,6 @@ function getDaysUntil(value?: string | null) {
   const today = new Date();
   const dayMs = 1000 * 60 * 60 * 24;
   return Math.ceil((target.getTime() - today.getTime()) / dayMs);
-}
-
-function getInitials(name?: string | null) {
-  if (!name) return "TN";
-
-  return name
-    .split(" ")
-    .map((part) => part[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
 }
 
 function getLeaseBadge(status?: string | null) {
@@ -242,6 +237,8 @@ export default function TenantPortalPage() {
   const [payments, setPayments] = useState<PaymentItem[]>([]);
   const [maintenance, setMaintenance] = useState<MaintenanceItem[]>([]);
   const [documents, setDocuments] = useState<TenantDocument[]>([]);
+  const [messageUnreadSummary, setMessageUnreadSummary] =
+    useState<MessageUnreadSummary | null>(null);
   const [error, setError] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -282,7 +279,15 @@ export default function TenantPortalPage() {
   }, [router]);
 
   useEffect(() => {
-    if (!checkingAuth) loadTenantPortal();
+    if (checkingAuth) return;
+
+    loadTenantPortal();
+
+    const interval = window.setInterval(() => {
+      loadMessageUnreadSummary(true);
+    }, 15000);
+
+    return () => window.clearInterval(interval);
   }, [checkingAuth]);
 
   async function loadTenantPortal() {
@@ -324,6 +329,7 @@ export default function TenantPortalPage() {
         setPayments([]);
         setMaintenance([]);
         setDocuments([]);
+        setMessageUnreadSummary(null);
         return;
       }
 
@@ -359,11 +365,43 @@ export default function TenantPortalPage() {
         : [];
 
       setDocuments(tenantDocuments);
+      await loadMessageUnreadSummary(true);
     } catch (err: any) {
       console.error("Tenant portal load error:", err);
       setError(err?.message || "Failed to load tenant portal.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadMessageUnreadSummary(silent = false) {
+    try {
+      const token = localStorage.getItem("token");
+
+      const res = await fetch(`${API_URL}/api/tenant/contact/unread`, {
+        cache: "no-store",
+        headers: {
+          Authorization: `Bearer ${token || ""}`,
+        },
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        if (!silent) {
+          throw new Error(data?.error || "Failed to load message notifications");
+        }
+        return;
+      }
+
+      setMessageUnreadSummary({
+        unreadCount: Number(data?.unreadCount || 0),
+        latestMessage: data?.latestMessage || null,
+      });
+    } catch (err) {
+      if (!silent) {
+        console.error("Tenant unread messages load error:", err);
+      }
     }
   }
 
@@ -446,8 +484,8 @@ export default function TenantPortalPage() {
     `${user?.tenant?.firstName || ""} ${user?.tenant?.lastName || ""}`.trim() ||
     "Tenant";
 
-  const initials = getInitials(fullName);
   const currentLease = user?.tenant?.leases?.[0] || null;
+  const unreadMessages = messageUnreadSummary?.unreadCount || 0;
 
   const monthlyRent =
     currentLease?.rentAmount ??
@@ -674,12 +712,12 @@ export default function TenantPortalPage() {
               />
 
               <aside className="absolute left-0 top-0 flex h-full w-80 max-w-[85vw] flex-col justify-between bg-gradient-to-b from-[#102a67] via-[#173d8e] to-[#0f1f45] text-white shadow-2xl">
-                <TenantSidebarContent
-                  initials={initials}
+                <TenantSidebar
                   fullName={fullName}
                   email={user?.email || user?.tenant?.email || "Tenant"}
                   onLogout={handleLogout}
                   onClose={() => setMobileMenuOpen(false)}
+                  unreadMessageCount={unreadMessages}
                   mobile
                 />
               </aside>
@@ -687,11 +725,11 @@ export default function TenantPortalPage() {
           )}
 
           <aside className="fixed inset-y-0 left-0 z-40 hidden w-80 shrink-0 flex-col justify-between bg-gradient-to-b from-[#102a67] via-[#173d8e] to-[#0f1f45] text-white shadow-2xl lg:flex">
-            <TenantSidebarContent
-              initials={initials}
+            <TenantSidebar
               fullName={fullName}
               email={user?.email || user?.tenant?.email || "Tenant"}
               onLogout={handleLogout}
+              unreadMessageCount={unreadMessages}
             />
           </aside>
 
@@ -748,6 +786,41 @@ export default function TenantPortalPage() {
             </div>
 
             <div className="p-6 md:p-8">
+              {unreadMessages > 0 && (
+                <Link
+                  href="/tenant/contact"
+                  className="mb-6 flex flex-col gap-4 rounded-[28px] border border-red-200 bg-red-50 p-5 text-red-950 shadow-sm transition hover:border-red-300 hover:bg-red-100 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="flex items-start gap-4">
+                    <span className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-red-600 text-white shadow-lg shadow-red-200">
+                      <MessageCircle className="h-6 w-6" />
+                      <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1 text-xs font-bold text-red-600 ring-2 ring-red-50">
+                        {unreadMessages > 99 ? "99+" : unreadMessages}
+                      </span>
+                    </span>
+
+                    <div>
+                      <p className="text-sm font-bold uppercase tracking-wide text-red-700">
+                        New landlord message
+                      </p>
+                      <h3 className="mt-1 text-xl font-semibold text-slate-950">
+                        {unreadMessages} unread message
+                        {unreadMessages > 1 ? "s" : ""}
+                      </h3>
+                      <p className="mt-1 max-w-2xl text-sm leading-6 text-red-800/80">
+                        {messageUnreadSummary?.latestMessage?.message ||
+                          "Open the conversation to read the latest message from management."}
+                      </p>
+                    </div>
+                  </div>
+
+                  <span className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-bold text-red-700 shadow-sm">
+                    Open conversation
+                    <ArrowRight className="h-4 w-4" />
+                  </span>
+                </Link>
+              )}
+
               <section className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-5">
                 <KpiCard title="Monthly Rent" value={formatMoney(activeMonthlyRent)} subtitle="Current rental amount" icon={<Wallet className="h-5 w-5" />} accent="blue" />
                 <KpiCard title="Paid Amount" value={formatMoney(currentMonthPaidAmount)} subtitle="Approved rent payments" icon={<BadgeCheck className="h-5 w-5" />} accent="emerald" />
@@ -1047,142 +1120,6 @@ function PasswordInput({
         placeholder={placeholder}
       />
     </div>
-  );
-}
-
-function TenantSidebarContent({
-  initials,
-  fullName,
-  email,
-  onLogout,
-  onClose,
-  mobile = false,
-}: {
-  initials: string;
-  fullName: string;
-  email: string;
-  onLogout: () => void;
-  onClose?: () => void;
-  mobile?: boolean;
-}) {
-  return (
-    <>
-      <div>
-        <div className="flex items-center justify-between border-b border-white/10 px-6 py-6">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">The House Hub</h1>
-            <p className="mt-1 text-sm text-blue-100/70">
-              Premium Tenant Workspace
-            </p>
-          </div>
-
-          {mobile && (
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-2xl bg-white/10 p-2 text-white hover:bg-white/20"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          )}
-        </div>
-
-        <div className="px-5 py-5">
-          <div className="rounded-3xl border border-white/10 bg-white/10 p-5 backdrop-blur">
-            <div className="flex items-center gap-4">
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/15 text-lg font-bold text-white">
-                {initials}
-              </div>
-              <div>
-                <p className="text-base font-semibold">{fullName}</p>
-                <p className="text-sm text-blue-100/70">{email}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <nav className="px-4 pb-6">
-          <p className="mb-3 px-3 text-xs font-semibold uppercase tracking-widest text-blue-200/50">
-            Tenant Menu
-          </p>
-
-          <div className="space-y-2" onClick={onClose}>
-            <SidebarItem label="Overview" icon={<Home size={18} />} active href="/tenant" />
-            <SidebarItem label="Payments" icon={<CreditCard size={18} />} href="/tenant/payments" />
-            <SidebarItem label="Maintenance" icon={<Wrench size={18} />} href="/tenant/maintenance" />
-            <SidebarItem label="Documents" icon={<FileText size={18} />} href="/tenant/documents" />
-            <SidebarItem label="AI Assistant" icon={<Sparkles size={18} />} href="/tenant/chatbot" />
-            <TenantNav label="Contact Landlord" href="/tenant/contact" icon={<MessageCircle size={18} />} />
-            <SidebarItem label="Notifications" icon={<Bell size={18} />} href="/tenant/notifications" />
-            <TenantNav label="Settings" href="/tenant/settings" icon={<Settings size={18} />} />
-          </div>
-        </nav>
-      </div>
-
-      <div className="border-t border-white/10 px-6 py-6">
-        <button
-          onClick={onLogout}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-red-200/20 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-100 transition hover:bg-red-500/20"
-        >
-          <LogOut size={16} />
-          Logout
-        </button>
-      </div>
-    </>
-  );
-}
-
-function SidebarItem({
-  label,
-  icon,
-  href,
-  active = false,
-}: {
-  label: string;
-  icon: ReactNode;
-  href: string;
-  active?: boolean;
-}) {
-  return (
-    <Link href={href}>
-      <div
-        className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition ${
-          active
-            ? "bg-white/15 text-white shadow"
-            : "text-blue-100/80 hover:bg-white/10 hover:text-white"
-        }`}
-      >
-        <span>{icon}</span>
-        <span>{label}</span>
-      </div>
-    </Link>
-  );
-}
-
-function TenantNav({
-  label,
-  href,
-  icon,
-  active = false,
-}: {
-  label: string;
-  href: string;
-  icon: ReactNode;
-  active?: boolean;
-}) {
-  return (
-    <Link href={href}>
-      <div
-        className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition ${
-          active
-            ? "bg-white/15 text-white"
-            : "text-blue-100/80 hover:bg-white/10 hover:text-white"
-        }`}
-      >
-        {icon}
-        {label}
-      </div>
-    </Link>
   );
 }
 
