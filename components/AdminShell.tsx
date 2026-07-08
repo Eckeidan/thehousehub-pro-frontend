@@ -182,17 +182,27 @@ export default function AdminShell({
         const token = localStorage.getItem("token");
         if (!token) return;
 
-        const res = await fetch(`${API_BASE}/api/payments/todos`, {
-          cache: "no-store",
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const responses = await Promise.all([
+          fetch(`${API_BASE}/api/payments/todos`, {
+            cache: "no-store",
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch(`${API_BASE}/api/maintenance/todos`, {
+            cache: "no-store",
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        ]);
 
-        if (!res.ok) return;
-
-        const data = await res.json().catch(() => null);
+        const counts = await Promise.all(
+          responses.map(async (response) => {
+            if (!response.ok) return 0;
+            const data = await response.json().catch(() => null);
+            return Number(data?.count || 0);
+          })
+        );
 
         if (!cancelled) {
-          setTodoCount(Number(data?.count || 0));
+          setTodoCount(counts.reduce((sum, count) => sum + count, 0));
         }
       } catch (error) {
         console.error("Admin todo count error:", error);

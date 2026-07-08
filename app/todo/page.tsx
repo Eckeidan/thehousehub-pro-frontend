@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
+  ArrowRight,
   CheckCircle2,
   ClipboardList,
   CreditCard,
@@ -12,6 +13,7 @@ import {
   FileText,
   Loader2,
   RefreshCw,
+  Wrench,
   XCircle,
 } from "lucide-react";
 import AdminShell from "@/components/AdminShell";
@@ -55,6 +57,36 @@ type PaymentApproval = {
   } | null;
 };
 
+type MaintenanceTodo = {
+  id: string;
+  requestNumber: string;
+  title: string;
+  description?: string | null;
+  category: string;
+  priority: string;
+  status: string;
+  createdAt?: string;
+  preferredDate?: string | null;
+  locationNote?: string | null;
+  tenant?: {
+    firstName?: string | null;
+    lastName?: string | null;
+    email?: string | null;
+    phone?: string | null;
+  } | null;
+  property?: {
+    name?: string | null;
+    code?: string | null;
+    addressLine1?: string | null;
+    city?: string | null;
+    state?: string | null;
+  } | null;
+  unit?: {
+    unitCode?: string | null;
+    unitName?: string | null;
+  } | null;
+};
+
 function formatMoney(value?: number | string | null) {
   const amount = Number(value || 0);
   return new Intl.NumberFormat("en-US", {
@@ -81,11 +113,44 @@ function proofUrl(value?: string | null) {
   return `${API_BASE}${value}`;
 }
 
+function formatLabel(value?: string | null) {
+  return value ? value.replaceAll("_", " ") : "N/A";
+}
+
+function priorityBadge(priority?: string | null) {
+  const normalized = String(priority || "").toUpperCase();
+
+  if (normalized === "URGENT" || normalized === "HIGH") {
+    return "bg-rose-100 text-rose-700";
+  }
+
+  if (normalized === "MEDIUM") {
+    return "bg-blue-100 text-blue-700";
+  }
+
+  return "bg-slate-100 text-slate-600";
+}
+
+function statusBadge(status?: string | null) {
+  const normalized = String(status || "").toUpperCase();
+
+  if (normalized === "OPEN") {
+    return "bg-amber-100 text-amber-700";
+  }
+
+  if (normalized === "IN_PROGRESS") {
+    return "bg-blue-100 text-blue-700";
+  }
+
+  return "bg-slate-100 text-slate-600";
+}
+
 export default function AdminTodoPage() {
   const router = useRouter();
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [user, setUser] = useState<StoredUser | null>(null);
   const [payments, setPayments] = useState<PaymentApproval[]>([]);
+  const [maintenanceRequests, setMaintenanceRequests] = useState<MaintenanceTodo[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -128,25 +193,43 @@ export default function AdminTodoPage() {
       setError("");
 
       const token = localStorage.getItem("token");
-      const res = await fetch(`${API_BASE}/api/payments/todos`, {
-        cache: "no-store",
-        headers: { Authorization: `Bearer ${token || ""}` },
-      });
+      const [paymentsRes, maintenanceRes] = await Promise.all([
+        fetch(`${API_BASE}/api/payments/todos`, {
+          cache: "no-store",
+          headers: { Authorization: `Bearer ${token || ""}` },
+        }),
+        fetch(`${API_BASE}/api/maintenance/todos`, {
+          cache: "no-store",
+          headers: { Authorization: `Bearer ${token || ""}` },
+        }),
+      ]);
 
-      if (res.status === 401) {
+      if (paymentsRes.status === 401 || maintenanceRes.status === 401) {
         localStorage.removeItem("token");
         localStorage.removeItem("user");
         router.replace("/");
         return;
       }
 
-      const data = await res.json().catch(() => null);
+      const [paymentsData, maintenanceData] = await Promise.all([
+        paymentsRes.json().catch(() => null),
+        maintenanceRes.json().catch(() => null),
+      ]);
 
-      if (!res.ok) {
-        throw new Error(data?.error || "Failed to load approvals.");
+      if (!paymentsRes.ok) {
+        throw new Error(paymentsData?.error || "Failed to load payment approvals.");
       }
 
-      setPayments(Array.isArray(data?.payments) ? data.payments : []);
+      if (!maintenanceRes.ok) {
+        throw new Error(
+          maintenanceData?.error || "Failed to load maintenance approvals."
+        );
+      }
+
+      setPayments(Array.isArray(paymentsData?.payments) ? paymentsData.payments : []);
+      setMaintenanceRequests(
+        Array.isArray(maintenanceData?.requests) ? maintenanceData.requests : []
+      );
     } catch (err: any) {
       console.error("To-do load error:", err);
       setError(err?.message || "Failed to load approvals.");
@@ -200,7 +283,11 @@ export default function AdminTodoPage() {
     }
   }
 
-  const totalPending = payments.length;
+  const totalPending = payments.length + maintenanceRequests.length;
+  const maintenanceCount = maintenanceRequests.length;
+  const urgentMaintenanceCount = maintenanceRequests.filter((request) =>
+    ["URGENT", "HIGH"].includes(String(request.priority || "").toUpperCase())
+  ).length;
   const pendingVolume = useMemo(
     () => payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
     [payments]
@@ -211,7 +298,7 @@ export default function AdminTodoPage() {
       user={user}
       activeItem="todo"
       title="To Do"
-      subtitle="Review tenant payment submissions and approve verified deposits."
+      subtitle="Review tenant payment submissions and open maintenance requests."
       actions={
         <button
           type="button"
@@ -238,11 +325,11 @@ export default function AdminTodoPage() {
           </div>
         )}
 
-        <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           <MetricCard
             label="Pending Approvals"
             value={String(totalPending)}
-            detail="Tenant-submitted payments"
+            detail="Payments and maintenance"
             icon={<ClipboardList className="h-5 w-5" />}
           />
           <MetricCard
@@ -252,11 +339,164 @@ export default function AdminTodoPage() {
             icon={<CreditCard className="h-5 w-5" />}
           />
           <MetricCard
+            label="Open Maintenance"
+            value={String(maintenanceCount)}
+            detail={
+              urgentMaintenanceCount > 0
+                ? `${urgentMaintenanceCount} high priority`
+                : "Tenant-submitted requests"
+            }
+            icon={<Wrench className="h-5 w-5" />}
+          />
+          <MetricCard
             label="Approval Rule"
             value="Manual"
             detail="Tenant proof must be verified"
             icon={<AlertTriangle className="h-5 w-5" />}
           />
+        </section>
+
+        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/5">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-xl font-bold text-slate-950 dark:text-white">
+                Maintenance Review Queue
+              </h2>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                Tenant-submitted issues that need admin follow-up.
+              </p>
+            </div>
+            <Link
+              href="/maintenance"
+              className="inline-flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-700"
+            >
+              Open maintenance center
+              <ExternalLink className="h-4 w-4" />
+            </Link>
+          </div>
+
+          <div className="mt-5">
+            {loading ? (
+              <div className="flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-5 py-12 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400">
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                Loading maintenance requests...
+              </div>
+            ) : maintenanceRequests.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 py-12 text-center dark:border-white/10 dark:bg-white/5">
+                <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-500" />
+                <p className="mt-3 text-lg font-bold text-slate-950 dark:text-white">
+                  No maintenance follow-up
+                </p>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                  New tenant maintenance submissions will appear here.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {maintenanceRequests.map((request) => {
+                  const tenantName =
+                    `${request.tenant?.firstName || ""} ${
+                      request.tenant?.lastName || ""
+                    }`.trim() ||
+                    request.tenant?.email ||
+                    "Tenant";
+                  const propertyName =
+                    request.property?.name ||
+                    request.property?.code ||
+                    "Assigned property";
+                  const propertyAddress = [
+                    request.property?.addressLine1,
+                    request.property?.city,
+                    request.property?.state,
+                  ]
+                    .filter(Boolean)
+                    .join(", ");
+                  const unitLabel =
+                    request.unit?.unitCode || request.unit?.unitName || "N/A";
+
+                  return (
+                    <article
+                      key={request.id}
+                      className="rounded-3xl border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-slate-900/70"
+                    >
+                      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1fr_auto]">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-3">
+                            <span
+                              className={`rounded-full px-3 py-1 text-xs font-bold ${statusBadge(
+                                request.status
+                              )}`}
+                            >
+                              {formatLabel(request.status)}
+                            </span>
+                            <span
+                              className={`rounded-full px-3 py-1 text-xs font-bold ${priorityBadge(
+                                request.priority
+                              )}`}
+                            >
+                              {formatLabel(request.priority)}
+                            </span>
+                            <span className="text-sm text-slate-500 dark:text-slate-400">
+                              Submitted {formatDate(request.createdAt)}
+                            </span>
+                          </div>
+
+                          <h3 className="mt-4 break-words text-lg font-black text-slate-950 dark:text-white">
+                            {request.title}
+                          </h3>
+                          <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
+                            Request #: {request.requestNumber}
+                          </p>
+                          <p className="mt-3 max-w-4xl whitespace-pre-line break-words text-sm leading-6 text-slate-600 dark:text-slate-300">
+                            {request.description || "No description provided."}
+                          </p>
+
+                          <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                            <InfoBlock label="Tenant" value={tenantName} />
+                            <InfoBlock label="Property" value={propertyName} />
+                            <InfoBlock label="Category" value={formatLabel(request.category)} />
+                            <InfoBlock label="Unit" value={unitLabel} />
+                          </div>
+
+                          <div className="mt-4 grid gap-4 md:grid-cols-3">
+                            <InfoBlock
+                              label="Location"
+                              value={request.locationNote || propertyAddress || "N/A"}
+                            />
+                            <InfoBlock
+                              label="Preferred Date"
+                              value={formatDate(request.preferredDate)}
+                            />
+                            <InfoBlock
+                              label="Admin Action"
+                              value="Review and assign contractor"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col gap-2 xl:w-48">
+                          <Link
+                            href={`/maintenance/${request.id}`}
+                            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-700"
+                          >
+                            Open Request
+                            <ArrowRight className="h-4 w-4" />
+                          </Link>
+                          <Link
+                            href="/maintenance"
+                            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
+                          >
+                            <Wrench className="h-4 w-4" />
+                            Work Queue
+                          </Link>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </section>
 
         <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/5">

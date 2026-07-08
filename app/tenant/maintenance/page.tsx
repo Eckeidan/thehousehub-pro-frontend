@@ -872,17 +872,17 @@ export default function TenantMaintenancePage() {
                     filteredRequests.map((item) => (
                       <div
                         key={item.id}
-                        className="rounded-3xl border border-slate-200 bg-slate-50 p-5 transition hover:border-slate-300 hover:bg-white"
+                        className="rounded-3xl border border-slate-200 bg-slate-50 p-4 transition hover:border-slate-300 hover:bg-white sm:p-5"
                       >
                         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                          <div className="flex gap-4">
-                            <div className="rounded-2xl bg-white p-3 text-slate-500 shadow-sm">
+                          <div className="flex min-w-0 flex-1 gap-3 sm:gap-4">
+                            <div className="h-fit shrink-0 rounded-2xl bg-white p-3 text-slate-500 shadow-sm">
                               {getStatusIcon(item.status)}
                             </div>
 
-                            <div className="flex-1">
+                            <div className="min-w-0 flex-1">
                               <div className="flex flex-wrap items-center gap-2">
-                                <h4 className="text-lg font-semibold text-slate-900">
+                                <h4 className="min-w-0 break-words text-lg font-semibold text-slate-900">
                                   {item.title}
                                 </h4>
 
@@ -895,11 +895,11 @@ export default function TenantMaintenancePage() {
                                 </span>
                               </div>
 
-                              <p className="mt-2 text-sm text-slate-500">
+                              <p className="mt-2 break-words text-sm text-slate-500">
                                 Request #: {item.requestNumber}
                               </p>
 
-                              <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
+                              <p className="mt-3 max-w-3xl whitespace-pre-line break-words text-sm leading-7 text-slate-600">
                                 {item.description || "No description provided."}
                               </p>
 
@@ -930,24 +930,24 @@ export default function TenantMaintenancePage() {
                                 </div>
                               )}
 
-                              <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                              <div className="mt-4 grid gap-3 sm:grid-cols-2 2xl:grid-cols-4">
                                 <InfoPill icon={<CalendarDays className="h-4 w-4" />} text={`Created: ${formatDate(item.createdAt)}`} />
                                 <InfoPill icon={<Wrench className="h-4 w-4" />} text={`Category: ${item.category?.replaceAll("_", " ")}`} />
                                 <InfoPill icon={<MapPin className="h-4 w-4" />} text={`Unit: ${item.unit?.unitCode || "N/A"}`} />
                                 <InfoPill icon={<ShieldCheck className="h-4 w-4" />} text={item.entryPermission ? "Entry allowed" : "Entry not allowed"} />
                               </div>
 
-                              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                              <div className="mt-4 grid gap-3 2xl:grid-cols-2">
                                 <InfoPill icon={<UserCircle2 className="h-4 w-4" />} text={`Contractor: ${item.contractor?.companyName || "Not assigned yet"}`} />
                                 <InfoPill icon={<BadgeDollarSign className="h-4 w-4" />} text={`Estimate: ${formatMoney(item.estimatedCost)}`} />
                               </div>
                             </div>
                           </div>
 
-                          <div className="flex shrink-0 flex-wrap items-center gap-2">
+                          <div className="flex w-full shrink-0 flex-wrap items-center gap-2 xl:w-auto">
                             <Link
                               href={`/tenant/maintenance/${item.id}`}
-                              className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+                              className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 sm:flex-none"
                             >
                               View
                               <ArrowRight className="h-4 w-4" />
@@ -956,7 +956,7 @@ export default function TenantMaintenancePage() {
                             {item.status === "OPEN" && (
                               <Link
                                 href={`/tenant/maintenance/edit/${item.id}`}
-                                className="inline-flex items-center gap-2 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 shadow-sm transition hover:bg-blue-100"
+                                className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 shadow-sm transition hover:bg-blue-100 sm:flex-none"
                               >
                                 <Pencil className="h-4 w-4" />
                                 Edit
@@ -1454,9 +1454,9 @@ function EmptyState({ text }: { text: string }) {
 
 function InfoPill({ icon, text }: { icon: React.ReactNode; text: string }) {
   return (
-    <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-3 text-xs font-medium text-slate-600">
-      <span className="text-slate-400">{icon}</span>
-      <span>{text}</span>
+    <div className="flex min-w-0 items-start gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-3 text-xs font-medium leading-5 text-slate-600">
+      <span className="mt-0.5 shrink-0 text-slate-400">{icon}</span>
+      <span className="min-w-0 break-words">{text}</span>
     </div>
   );
 }
