@@ -22,20 +22,18 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import AdminShell from "@/components/AdminShell";
+import {
+  CURRENCY_OPTIONS,
+  TIMEZONE_OPTIONS,
+  buildOrganizationSettingsPayload,
+  formatRentDueDay,
+  getTenantPaymentMapping,
+  normalizeOrganizationPaymentSettings,
+  validateOrganizationPaymentSettings,
+  type OrganizationPaymentSettings,
+} from "@/lib/paymentSettingsContract";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-
-const CURRENCY_OPTIONS = [
-  { value: "USD", label: "USD - US Dollar" },
-  { value: "EUR", label: "EUR - Euro" },
-  { value: "CDF", label: "CDF - Congolese Franc" },
-];
-
-const TIMEZONE_OPTIONS = [
-  { value: "UTC", label: "UTC" },
-  { value: "Africa/Kinshasa", label: "Africa/Kinshasa" },
-  { value: "America/New_York", label: "America/New York" },
-];
 
 type StoredUser = {
   id?: string;
@@ -63,44 +61,6 @@ type NotificationState = {
   title: string;
   message: string;
 };
-
-function isValidEmail(value: string) {
-  if (!value.trim()) return true;
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
-}
-
-function isValidHttpUrl(value: string) {
-  if (!value.trim()) return true;
-
-  try {
-    const url = new URL(value.trim());
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
-function formatMoney(value: number, currency: string) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(Number.isFinite(value) ? value : 0);
-}
-
-function formatDueDay(day: number) {
-  const safeDay = Number.isFinite(day) ? Math.min(Math.max(day, 1), 31) : 1;
-  const suffix =
-    safeDay % 10 === 1 && safeDay !== 11
-      ? "st"
-      : safeDay % 10 === 2 && safeDay !== 12
-      ? "nd"
-      : safeDay % 10 === 3 && safeDay !== 13
-      ? "rd"
-      : "th";
-
-  return `${safeDay}${suffix} day of every month`;
-}
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -247,26 +207,28 @@ export default function SettingsPage() {
         throw new Error(data?.error || "Failed to load settings");
       }
 
-      setCompanyName(data?.companyName || "");
-      setEmail(data?.email || "");
-      setCurrency(data?.currency || "USD");
-      setTimezone(data?.timezone || "UTC");
+      const settings = normalizeOrganizationPaymentSettings(data);
 
-      setLogoUrl(data?.logoUrl || "");
-      setPrimaryColor(data?.primaryColor || "#1f3270");
-      setSupportEmail(data?.supportEmail || "");
+      setCompanyName(settings.companyName);
+      setEmail(settings.email);
+      setCurrency(settings.currency);
+      setTimezone(settings.timezone);
 
-      setBankName(data?.bankName || "");
-      setBankAccountName(data?.bankAccountName || "");
-      setBankAccountNumber(data?.bankAccountNumber || "");
-      setPaymentInstructions(data?.paymentInstructions || "");
-      setRentDueDay(Number(data?.rentDueDay || 1));
-      setLateFeeAmount(Number(data?.lateFeeAmount || 0));
+      setLogoUrl(settings.logoUrl);
+      setPrimaryColor(settings.primaryColor);
+      setSupportEmail(settings.supportEmail);
 
-      setTenantAccessDefault(Boolean(data?.tenantAccessDefault));
-      setNotifications(Boolean(data?.notifications));
-      setMaintenanceAlerts(Boolean(data?.maintenanceAlerts));
-      setLeaseReminders(Boolean(data?.leaseReminders));
+      setBankName(settings.bankName);
+      setBankAccountName(settings.bankAccountName);
+      setBankAccountNumber(settings.bankAccountNumber);
+      setPaymentInstructions(settings.paymentInstructions);
+      setRentDueDay(settings.rentDueDay);
+      setLateFeeAmount(settings.lateFeeAmount);
+
+      setTenantAccessDefault(settings.tenantAccessDefault);
+      setNotifications(settings.notifications);
+      setMaintenanceAlerts(settings.maintenanceAlerts);
+      setLeaseReminders(settings.leaseReminders);
     } catch (error: any) {
       showNotification(
         "error",
@@ -324,39 +286,8 @@ export default function SettingsPage() {
       return;
     }
 
-    const validationErrors: string[] = [];
-
-    if (!companyName.trim()) {
-      validationErrors.push("Company name is required.");
-    }
-
-    if (!email.trim()) {
-      validationErrors.push("Company email is required.");
-    }
-
-    if (!isValidEmail(email)) {
-      validationErrors.push("Company email must be valid.");
-    }
-
-    if (!isValidEmail(supportEmail)) {
-      validationErrors.push("Support email must be valid when provided.");
-    }
-
-    if (!isValidHttpUrl(logoUrl)) {
-      validationErrors.push("Logo URL must start with http:// or https://.");
-    }
-
-    if (!/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(primaryColor)) {
-      validationErrors.push("Primary brand color must be a valid hex color.");
-    }
-
-    if (!Number.isInteger(rentDueDay) || rentDueDay < 1 || rentDueDay > 31) {
-      validationErrors.push("Rent due day must be between 1 and 31.");
-    }
-
-    if (!Number.isFinite(lateFeeAmount) || lateFeeAmount < 0) {
-      validationErrors.push("Late fee amount cannot be negative.");
-    }
+    const validationErrors =
+      validateOrganizationPaymentSettings(currentOrganizationSettings);
 
     if (validationErrors.length > 0) {
       showNotification(
@@ -378,25 +309,9 @@ export default function SettingsPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token || ""}`,
         },
-        body: JSON.stringify({
-          companyName,
-          email,
-          currency,
-          timezone,
-          logoUrl,
-          primaryColor,
-          supportEmail,
-          bankName,
-          bankAccountName,
-          bankAccountNumber,
-          paymentInstructions,
-          rentDueDay,
-          lateFeeAmount,
-          tenantAccessDefault,
-          notifications,
-          maintenanceAlerts,
-          leaseReminders,
-        }),
+        body: JSON.stringify(
+          buildOrganizationSettingsPayload(currentOrganizationSettings)
+        ),
       });
 
       if (res.status === 401) {
@@ -609,44 +524,53 @@ export default function SettingsPage() {
     });
   }, [users]);
 
+  const currentOrganizationSettings = useMemo<OrganizationPaymentSettings>(
+    () =>
+      normalizeOrganizationPaymentSettings({
+        companyName,
+        email,
+        currency,
+        timezone,
+        logoUrl,
+        primaryColor,
+        supportEmail,
+        bankName,
+        bankAccountName,
+        bankAccountNumber,
+        paymentInstructions,
+        rentDueDay,
+        lateFeeAmount,
+        tenantAccessDefault,
+        notifications,
+        maintenanceAlerts,
+        leaseReminders,
+      }),
+    [
+      companyName,
+      email,
+      currency,
+      timezone,
+      logoUrl,
+      primaryColor,
+      supportEmail,
+      bankName,
+      bankAccountName,
+      bankAccountNumber,
+      paymentInstructions,
+      rentDueDay,
+      lateFeeAmount,
+      tenantAccessDefault,
+      notifications,
+      maintenanceAlerts,
+      leaseReminders,
+    ]
+  );
+
   const isError = notification.type === "error";
-  const tenantPaymentPreview = [
-    {
-      label: "Bank / Payment Method",
-      ownerValue: bankName || "Not configured",
-      tenantLocation: "Tenant portal → Payment Details",
-    },
-    {
-      label: "Account Name",
-      ownerValue: bankAccountName || "Not configured",
-      tenantLocation: "Tenant portal → Payment Details",
-    },
-    {
-      label: "Account / Routing / Zelle / CashApp",
-      ownerValue: bankAccountNumber || "Not configured",
-      tenantLocation: "Tenant portal → Payment Details",
-    },
-    {
-      label: "Rent Due Day",
-      ownerValue: formatDueDay(rentDueDay),
-      tenantLocation: "Tenant portal → Due Date",
-    },
-    {
-      label: "Late Fee",
-      ownerValue: formatMoney(lateFeeAmount, currency),
-      tenantLocation: "Tenant portal → Late Fee",
-    },
-    {
-      label: "Payment Instructions",
-      ownerValue: paymentInstructions || "Not configured",
-      tenantLocation: "Tenant portal → Payment Instructions",
-    },
-    {
-      label: "Support Email",
-      ownerValue: supportEmail || email || "Not configured",
-      tenantLocation: "Tenant portal → Support",
-    },
-  ];
+  const tenantPaymentPreview = useMemo(
+    () => getTenantPaymentMapping(currentOrganizationSettings),
+    [currentOrganizationSettings]
+  );
 
   if (checkingAuth) {
     return (
@@ -942,7 +866,7 @@ export default function SettingsPage() {
                       </p>
                     </div>
                     <div className="rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-emerald-700 shadow-sm">
-                      Due: {formatDueDay(rentDueDay)}
+                      Due: {formatRentDueDay(rentDueDay)}
                     </div>
                   </div>
 

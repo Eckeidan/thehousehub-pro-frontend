@@ -19,24 +19,15 @@ import {
   X,
 } from "lucide-react";
 import TenantAIWidget from "@/components/TenantAIWidget";
+import {
+  formatMoney,
+  formatRentDueDay,
+  normalizeTenantPaymentSettings,
+  type TenantPaymentSettings,
+} from "@/lib/paymentSettingsContract";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-
-type Settings = {
-  companyName?: string | null;
-  email?: string | null;
-  logoUrl?: string | null;
-  primaryColor?: string | null;
-  supportEmail?: string | null;
-  bankName?: string | null;
-  bankAccountName?: string | null;
-  bankAccountNumber?: string | null;
-  paymentInstructions?: string | null;
-  rentDueDay?: number | null;
-  lateFeeAmount?: number | null;
-  currency?: string | null;
-};
 
 type Payment = {
   id: string;
@@ -50,34 +41,10 @@ type Payment = {
   proofFileName?: string | null;
 };
 
-function formatMoney(value: number, currency: string) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(Number.isFinite(value) ? value : 0);
-}
-
-function formatDueDay(day?: number | null) {
-  const safeDay = Number.isFinite(Number(day))
-    ? Math.min(Math.max(Number(day), 1), 31)
-    : 1;
-  const suffix =
-    safeDay % 10 === 1 && safeDay !== 11
-      ? "st"
-      : safeDay % 10 === 2 && safeDay !== 12
-      ? "nd"
-      : safeDay % 10 === 3 && safeDay !== 13
-      ? "rd"
-      : "th";
-
-  return `${safeDay}${suffix} day`;
-}
-
 export default function TenantPaymentsPage() {
   const router = useRouter();
 
-  const [settings, setSettings] = useState<Settings | null>(null);
+  const [settings, setSettings] = useState<TenantPaymentSettings | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [rentAmount, setRentAmount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -149,7 +116,7 @@ export default function TenantPaymentsPage() {
         throw new Error(settingsData?.error || "Failed to load settings");
       }
 
-      setSettings(settingsData);
+      setSettings(normalizeTenantPaymentSettings(settingsData));
       setPayments(Array.isArray(paymentsData) ? paymentsData : []);
 
       const tenant = meData?.user?.tenant;
@@ -447,7 +414,7 @@ export default function TenantPaymentsPage() {
               icon={<CalendarDays className="h-5 w-5" />}
               title="Due Date"
               label="Rent due every month"
-              value={formatDueDay(dueDay)}
+              value={formatRentDueDay(dueDay, "short")}
               sub="Configured by your landlord"
               color="amber"
             />
