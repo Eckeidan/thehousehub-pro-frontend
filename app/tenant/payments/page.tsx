@@ -50,6 +50,30 @@ type Payment = {
   proofFileName?: string | null;
 };
 
+function formatMoney(value: number, currency: string) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0,
+  }).format(Number.isFinite(value) ? value : 0);
+}
+
+function formatDueDay(day?: number | null) {
+  const safeDay = Number.isFinite(Number(day))
+    ? Math.min(Math.max(Number(day), 1), 31)
+    : 1;
+  const suffix =
+    safeDay % 10 === 1 && safeDay !== 11
+      ? "st"
+      : safeDay % 10 === 2 && safeDay !== 12
+      ? "nd"
+      : safeDay % 10 === 3 && safeDay !== 13
+      ? "rd"
+      : "th";
+
+  return `${safeDay}${suffix} day`;
+}
+
 export default function TenantPaymentsPage() {
   const router = useRouter();
 
@@ -129,8 +153,14 @@ export default function TenantPaymentsPage() {
       setPayments(Array.isArray(paymentsData) ? paymentsData : []);
 
       const tenant = meData?.user?.tenant;
+      const activeLease = Array.isArray(tenant?.leases)
+        ? tenant.leases.find(
+            (lease: any) => String(lease?.status || "").toUpperCase() === "ACTIVE"
+          ) || tenant.leases[0]
+        : null;
 
       const rent =
+        Number(activeLease?.rentAmount) ||
         Number(tenant?.monthlyRent) ||
         Number(tenant?.property?.monthlyRent) ||
         0;
@@ -141,10 +171,6 @@ export default function TenantPaymentsPage() {
         ...prev,
         amount: rent ? String(rent) : "",
       }));
-      
-
-
-
     } catch (err: any) {
       console.error("Tenant payments load error:", err);
       setError(err?.message || "Failed to load payment information.");
@@ -222,6 +248,8 @@ export default function TenantPaymentsPage() {
 
   const brandColor = settings?.primaryColor || "#1f3270";
   const currency = settings?.currency || "USD";
+  const dueDay = Number(settings?.rentDueDay || 1);
+  const lateFee = Number(settings?.lateFeeAmount || 0);
 
   if (loading) {
     return (
@@ -341,6 +369,10 @@ export default function TenantPaymentsPage() {
                 {settings?.paymentInstructions ||
                   "Payment instructions have not been configured yet. Please contact your property manager."}
               </div>
+              <div className="mt-4 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-800">
+                After making your manual payment, upload proof from this page.
+                The payment appears as approved only after management validates it.
+              </div>
             </Card>
 
             <Card title="Payment History" icon={<CreditCard className="h-5 w-5" />}>
@@ -358,7 +390,7 @@ export default function TenantPaymentsPage() {
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                           <p className="font-bold text-slate-900">
-                            {currency} {Number(payment.amount || 0).toFixed(0)}
+                            {formatMoney(Number(payment.amount || 0), currency)}
                           </p>
                           <p className="mt-1 text-xs text-slate-500">
                             {new Date(payment.paymentDate).toLocaleDateString()} •{" "}
@@ -407,7 +439,7 @@ export default function TenantPaymentsPage() {
               icon={<Home className="h-5 w-5" />}
               title="Monthly Rent"
               label="Amount due"
-              value={`${currency} ${rentAmount.toFixed(0)}`}
+              value={formatMoney(rentAmount, currency)}
               color="green"
             />
 
@@ -415,8 +447,8 @@ export default function TenantPaymentsPage() {
               icon={<CalendarDays className="h-5 w-5" />}
               title="Due Date"
               label="Rent due every month"
-              value={`${settings?.rentDueDay || 1}`}
-              sub="Day of the month"
+              value={formatDueDay(dueDay)}
+              sub="Configured by your landlord"
               color="amber"
             />
 
@@ -424,7 +456,7 @@ export default function TenantPaymentsPage() {
               icon={<AlertTriangle className="h-5 w-5" />}
               title="Late Fee"
               label="Late payment fee"
-              value={`${currency} ${Number(settings?.lateFeeAmount || 0).toFixed(0)}`}
+              value={formatMoney(lateFee, currency)}
               color="red"
             />
 
@@ -641,6 +673,8 @@ function InfoBox({
   copied: boolean;
   wide?: boolean;
 }) {
+  const isConfigured = value !== "Not configured";
+
   return (
     <div
       className={`rounded-2xl border border-slate-200 bg-slate-50 p-4 ${
@@ -657,7 +691,9 @@ function InfoBox({
         <button
           type="button"
           onClick={onCopy}
-          className="shrink-0 rounded-xl border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-100"
+          disabled={!isConfigured}
+          className="shrink-0 rounded-xl border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+          aria-label={`Copy ${label}`}
         >
           {copied ? (
             <CheckCircle2 className="h-4 w-4 text-emerald-600" />

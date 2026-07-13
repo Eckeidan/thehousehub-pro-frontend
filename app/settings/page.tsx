@@ -25,6 +25,18 @@ import AdminShell from "@/components/AdminShell";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
+const CURRENCY_OPTIONS = [
+  { value: "USD", label: "USD - US Dollar" },
+  { value: "EUR", label: "EUR - Euro" },
+  { value: "CDF", label: "CDF - Congolese Franc" },
+];
+
+const TIMEZONE_OPTIONS = [
+  { value: "UTC", label: "UTC" },
+  { value: "Africa/Kinshasa", label: "Africa/Kinshasa" },
+  { value: "America/New_York", label: "America/New York" },
+];
+
 type StoredUser = {
   id?: string;
   fullName?: string;
@@ -51,6 +63,44 @@ type NotificationState = {
   title: string;
   message: string;
 };
+
+function isValidEmail(value: string) {
+  if (!value.trim()) return true;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+function isValidHttpUrl(value: string) {
+  if (!value.trim()) return true;
+
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function formatMoney(value: number, currency: string) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0,
+  }).format(Number.isFinite(value) ? value : 0);
+}
+
+function formatDueDay(day: number) {
+  const safeDay = Number.isFinite(day) ? Math.min(Math.max(day, 1), 31) : 1;
+  const suffix =
+    safeDay % 10 === 1 && safeDay !== 11
+      ? "st"
+      : safeDay % 10 === 2 && safeDay !== 12
+      ? "nd"
+      : safeDay % 10 === 3 && safeDay !== 13
+      ? "rd"
+      : "th";
+
+  return `${safeDay}${suffix} day of every month`;
+}
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -270,6 +320,49 @@ export default function SettingsPage() {
         "error",
         "Read-only access",
         "Only the connected Admin can modify organization settings."
+      );
+      return;
+    }
+
+    const validationErrors: string[] = [];
+
+    if (!companyName.trim()) {
+      validationErrors.push("Company name is required.");
+    }
+
+    if (!email.trim()) {
+      validationErrors.push("Company email is required.");
+    }
+
+    if (!isValidEmail(email)) {
+      validationErrors.push("Company email must be valid.");
+    }
+
+    if (!isValidEmail(supportEmail)) {
+      validationErrors.push("Support email must be valid when provided.");
+    }
+
+    if (!isValidHttpUrl(logoUrl)) {
+      validationErrors.push("Logo URL must start with http:// or https://.");
+    }
+
+    if (!/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(primaryColor)) {
+      validationErrors.push("Primary brand color must be a valid hex color.");
+    }
+
+    if (!Number.isInteger(rentDueDay) || rentDueDay < 1 || rentDueDay > 31) {
+      validationErrors.push("Rent due day must be between 1 and 31.");
+    }
+
+    if (!Number.isFinite(lateFeeAmount) || lateFeeAmount < 0) {
+      validationErrors.push("Late fee amount cannot be negative.");
+    }
+
+    if (validationErrors.length > 0) {
+      showNotification(
+        "error",
+        "Check settings",
+        validationErrors.join(" ")
       );
       return;
     }
@@ -517,6 +610,43 @@ export default function SettingsPage() {
   }, [users]);
 
   const isError = notification.type === "error";
+  const tenantPaymentPreview = [
+    {
+      label: "Bank / Payment Method",
+      ownerValue: bankName || "Not configured",
+      tenantLocation: "Tenant portal → Payment Details",
+    },
+    {
+      label: "Account Name",
+      ownerValue: bankAccountName || "Not configured",
+      tenantLocation: "Tenant portal → Payment Details",
+    },
+    {
+      label: "Account / Routing / Zelle / CashApp",
+      ownerValue: bankAccountNumber || "Not configured",
+      tenantLocation: "Tenant portal → Payment Details",
+    },
+    {
+      label: "Rent Due Day",
+      ownerValue: formatDueDay(rentDueDay),
+      tenantLocation: "Tenant portal → Due Date",
+    },
+    {
+      label: "Late Fee",
+      ownerValue: formatMoney(lateFeeAmount, currency),
+      tenantLocation: "Tenant portal → Late Fee",
+    },
+    {
+      label: "Payment Instructions",
+      ownerValue: paymentInstructions || "Not configured",
+      tenantLocation: "Tenant portal → Payment Instructions",
+    },
+    {
+      label: "Support Email",
+      ownerValue: supportEmail || email || "Not configured",
+      tenantLocation: "Tenant portal → Support",
+    },
+  ];
 
   if (checkingAuth) {
     return (
@@ -642,17 +772,24 @@ export default function SettingsPage() {
               >
                 <div className="grid gap-4 md:grid-cols-2">
                   <Input
+                    label="Company name"
                     value={companyName}
                     disabled={!canEditSettings}
                     onChange={setCompanyName}
-                    placeholder="Company Name"
+                    placeholder="The House Hub"
+                    helper="Displayed in admin context and tenant-facing payment branding."
+                    required
                   />
                   <Input
+                    label="Company email"
                     value={email}
                     disabled={!canEditSettings}
                     onChange={setEmail}
-                    placeholder="Company Email"
+                    placeholder="billing@company.com"
                     type="email"
+                    helper="Used as fallback support contact when no support email is configured."
+                    required
+                    autoComplete="email"
                   />
                 </div>
               </SettingsCard>
@@ -664,17 +801,22 @@ export default function SettingsPage() {
               >
                 <div className="grid gap-4 md:grid-cols-2">
                   <Input
+                    label="Logo URL"
                     value={logoUrl}
                     disabled={!canEditSettings}
                     onChange={setLogoUrl}
-                    placeholder="Logo URL"
+                    placeholder="https://example.com/logo.png"
+                    helper="Shown on the tenant payment portal header when configured."
                   />
                   <Input
+                    label="Support email"
                     value={supportEmail}
                     disabled={!canEditSettings}
                     onChange={setSupportEmail}
-                    placeholder="Support Email"
+                    placeholder="support@company.com"
                     type="email"
+                    helper="Tenant payment support uses this address first."
+                    autoComplete="email"
                   />
 
                   <div className="md:col-span-2 rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -693,9 +835,13 @@ export default function SettingsPage() {
                         value={primaryColor}
                         disabled={!canEditSettings}
                         onChange={(e) => setPrimaryColor(e.target.value)}
-                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
                       />
                     </div>
+                    <p className="mt-2 text-xs leading-5 text-slate-500">
+                      Hex color used for tenant payment branding and primary
+                      interface accents.
+                    </p>
 
                     {logoUrl && (
                       <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
@@ -720,46 +866,108 @@ export default function SettingsPage() {
               >
                 <div className="grid gap-4 md:grid-cols-2">
                   <Input
+                    label="Bank / payment method"
                     value={bankName}
                     disabled={!canEditSettings}
                     onChange={setBankName}
-                    placeholder="Bank Name"
+                    placeholder="Bank of America, Zelle, CashApp..."
+                    helper="Tenant sees this under Payment Details."
                   />
                   <Input
+                    label="Account name"
                     value={bankAccountName}
                     disabled={!canEditSettings}
                     onChange={setBankAccountName}
-                    placeholder="Account Name"
+                    placeholder="The House Hub LLC"
+                    helper="Tenant sees this exactly as the account owner name."
                   />
                   <Input
+                    label="Account / routing / wallet details"
                     value={bankAccountNumber}
                     disabled={!canEditSettings}
                     onChange={setBankAccountNumber}
-                    placeholder="Account Number / Routing / Zelle / CashApp"
+                    placeholder="Account number, routing, Zelle, CashApp, or MoMo reference"
+                    helper="Keep this complete enough for the tenant to make a manual payment."
                   />
                   <Input
+                    label="Rent due day"
                     value={String(rentDueDay)}
                     disabled={!canEditSettings}
                     onChange={(v) => setRentDueDay(Number(v))}
-                    placeholder="Rent Due Day"
+                    placeholder="1"
                     type="number"
+                    min={1}
+                    max={31}
+                    step={1}
+                    helper="Day of the month shown on the tenant payment portal."
+                    required
                   />
                   <Input
+                    label="Late fee amount"
                     value={String(lateFeeAmount)}
                     disabled={!canEditSettings}
                     onChange={(v) => setLateFeeAmount(Number(v))}
-                    placeholder="Late Fee Amount"
+                    placeholder="0"
                     type="number"
+                    min={0}
+                    step="0.01"
+                    helper="Displayed to the tenant as the late payment fee."
                   />
 
-                  <textarea
-                    value={paymentInstructions}
-                    disabled={!canEditSettings}
-                    onChange={(e) => setPaymentInstructions(e.target.value)}
-                    placeholder="Payment instructions for tenants..."
-                    rows={5}
-                    className="md:col-span-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 outline-none transition disabled:cursor-not-allowed disabled:opacity-70 focus:border-blue-600 focus:bg-white"
-                  />
+                  <div className="md:col-span-2">
+                    <TextareaField
+                      label="Payment instructions"
+                      helper="Tenant sees this text in the Payment Instructions section. Include deposit steps, reference rules, and approval expectations."
+                      value={paymentInstructions}
+                      disabled={!canEditSettings}
+                      onChange={setPaymentInstructions}
+                      placeholder="Example: Deposit rent by bank transfer, then upload receipt with tenant name and month in the reference."
+                      rows={5}
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-6 rounded-3xl border border-emerald-200 bg-emerald-50 p-5">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <p className="text-sm font-bold uppercase tracking-wide text-emerald-700">
+                        Tenant portal mapping
+                      </p>
+                      <h4 className="mt-1 text-lg font-semibold text-slate-950">
+                        Owner configuration → tenant payment screen
+                      </h4>
+                      <p className="mt-1 text-sm leading-6 text-emerald-900/70">
+                        These values are read by `/tenant/payments` from the
+                        same organization-scoped settings record.
+                      </p>
+                    </div>
+                    <div className="rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-emerald-700 shadow-sm">
+                      Due: {formatDueDay(rentDueDay)}
+                    </div>
+                  </div>
+
+                  <div className="mt-5 grid gap-3">
+                    {tenantPaymentPreview.map((item) => (
+                      <div
+                        key={item.label}
+                        className="rounded-2xl border border-emerald-100 bg-white p-4"
+                      >
+                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                          <div>
+                            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                              {item.label}
+                            </p>
+                            <p className="mt-1 break-words text-sm font-semibold text-slate-900">
+                              {item.ownerValue}
+                            </p>
+                          </div>
+                          <p className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                            {item.tenantLocation}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </SettingsCard>
 
@@ -769,27 +977,23 @@ export default function SettingsPage() {
                 color="purple"
               >
                 <div className="grid gap-4 md:grid-cols-2">
-                  <select
+                  <SelectField
+                    label="Currency"
+                    helper="Controls tenant-facing rent, late fee and payment history currency labels."
                     value={currency}
                     disabled={!canEditSettings}
-                    onChange={(e) => setCurrency(e.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 outline-none transition disabled:cursor-not-allowed disabled:opacity-70 focus:border-blue-600 focus:bg-white"
-                  >
-                    <option value="USD">USD</option>
-                    <option value="EUR">EUR</option>
-                    <option value="CDF">CDF</option>
-                  </select>
+                    onChange={setCurrency}
+                    options={CURRENCY_OPTIONS}
+                  />
 
-                  <select
+                  <SelectField
+                    label="Timezone"
+                    helper="Used for organization scheduling and future payment reminders."
                     value={timezone}
                     disabled={!canEditSettings}
-                    onChange={(e) => setTimezone(e.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 outline-none transition disabled:cursor-not-allowed disabled:opacity-70 focus:border-blue-600 focus:bg-white"
-                  >
-                    <option value="UTC">UTC</option>
-                    <option value="Africa/Kinshasa">Africa/Kinshasa</option>
-                    <option value="America/New_York">America/New_York</option>
-                  </select>
+                    onChange={setTimezone}
+                    options={TIMEZONE_OPTIONS}
+                  />
                 </div>
               </SettingsCard>
 
@@ -820,43 +1024,53 @@ export default function SettingsPage() {
                       className="grid gap-4 md:grid-cols-2"
                     >
                       <Input
+                        label="Full name"
                         value={newUserForm.fullName}
                         onChange={(v) =>
                           setNewUserForm((p) => ({ ...p, fullName: v }))
                         }
                         placeholder="Full Name"
+                        helper="Name shown in admin account lists and audit trails."
+                        required
                       />
 
-                      <select
+                      <SelectField
+                        label="Account role"
+                        helper="Choose the operational permission profile for this user."
                         value={newUserForm.role}
-                        onChange={(e) =>
-                          setNewUserForm((p) => ({
-                            ...p,
-                            role: e.target.value,
-                          }))
+                        onChange={(value) =>
+                          setNewUserForm((p) => ({ ...p, role: value }))
                         }
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 outline-none"
-                      >
-                        <option value="ADMIN">Admin</option>
-                        <option value="OWNER">Owner</option>
-                      </select>
+                        options={[
+                          { value: "ADMIN", label: "Admin" },
+                          { value: "OWNER", label: "Owner" },
+                        ]}
+                      />
 
                       <Input
+                        label="Email"
                         value={newUserForm.email}
                         onChange={(v) =>
                           setNewUserForm((p) => ({ ...p, email: v }))
                         }
                         placeholder="Email"
                         type="email"
+                        helper="Login email for the new user."
+                        required
+                        autoComplete="email"
                       />
 
                       <Input
+                        label="Temporary password"
                         value={newUserForm.password}
                         onChange={(v) =>
                           setNewUserForm((p) => ({ ...p, password: v }))
                         }
                         placeholder="Password"
                         type="password"
+                        helper="Use at least 8 characters. The user can change it after login."
+                        required
+                        autoComplete="new-password"
                       />
 
                       <div className="md:col-span-2">
@@ -982,6 +1196,7 @@ export default function SettingsPage() {
               >
                 <form onSubmit={handleChangePassword} className="space-y-4">
                   <Input
+                    label="Current password"
                     value={passwordForm.currentPassword}
                     onChange={(v) =>
                       setPasswordForm((p) => ({
@@ -991,9 +1206,12 @@ export default function SettingsPage() {
                     }
                     placeholder="Current password"
                     type="password"
+                    helper="Required to confirm this security-sensitive change."
+                    autoComplete="current-password"
                   />
 
                   <Input
+                    label="New password"
                     value={passwordForm.newPassword}
                     onChange={(v) =>
                       setPasswordForm((p) => ({
@@ -1003,9 +1221,12 @@ export default function SettingsPage() {
                     }
                     placeholder="New password"
                     type="password"
+                    helper="Minimum 8 characters."
+                    autoComplete="new-password"
                   />
 
                   <Input
+                    label="Confirm new password"
                     value={passwordForm.confirmPassword}
                     onChange={(v) =>
                       setPasswordForm((p) => ({
@@ -1015,6 +1236,8 @@ export default function SettingsPage() {
                     }
                     placeholder="Confirm new password"
                     type="password"
+                    helper="Must match the new password exactly."
+                    autoComplete="new-password"
                   />
 
                   <button
@@ -1069,24 +1292,124 @@ function Input({
   value,
   onChange,
   placeholder,
+  label,
+  helper,
   type = "text",
   disabled = false,
+  min,
+  max,
+  step,
+  required = false,
+  autoComplete,
 }: {
   value: string;
   onChange: (value: string) => void;
   placeholder: string;
+  label?: string;
+  helper?: string;
   type?: string;
+  disabled?: boolean;
+  min?: number;
+  max?: number;
+  step?: number | string;
+  required?: boolean;
+  autoComplete?: string;
+}) {
+  return (
+    <div>
+      {label && (
+        <label className="mb-2 block text-sm font-semibold text-slate-800">
+          {label}
+          {required && <span className="text-red-500"> *</span>}
+        </label>
+      )}
+      <input
+        type={type}
+        value={value}
+        disabled={disabled}
+        min={min}
+        max={max}
+        step={step}
+        required={required}
+        autoComplete={autoComplete}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-70 focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-100"
+      />
+      {helper && <p className="mt-2 text-xs leading-5 text-slate-500">{helper}</p>}
+    </div>
+  );
+}
+
+function TextareaField({
+  label,
+  helper,
+  value,
+  onChange,
+  placeholder,
+  disabled = false,
+  rows = 5,
+}: {
+  label: string;
+  helper?: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  disabled?: boolean;
+  rows?: number;
+}) {
+  return (
+    <div>
+      <label className="mb-2 block text-sm font-semibold text-slate-800">
+        {label}
+      </label>
+      <textarea
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        rows={rows}
+        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-70 focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-100"
+      />
+      {helper && <p className="mt-2 text-xs leading-5 text-slate-500">{helper}</p>}
+    </div>
+  );
+}
+
+function SelectField({
+  label,
+  helper,
+  value,
+  onChange,
+  options,
+  disabled = false,
+}: {
+  label: string;
+  helper?: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: Array<{ value: string; label: string }>;
   disabled?: boolean;
 }) {
   return (
-    <input
-      type={type}
-      value={value}
-      disabled={disabled}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 outline-none transition disabled:cursor-not-allowed disabled:opacity-70 focus:border-blue-600 focus:bg-white"
-    />
+    <div>
+      <label className="mb-2 block text-sm font-semibold text-slate-800">
+        {label}
+      </label>
+      <select
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-800 outline-none transition disabled:cursor-not-allowed disabled:opacity-70 focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-100"
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      {helper && <p className="mt-2 text-xs leading-5 text-slate-500">{helper}</p>}
+    </div>
   );
 }
 
