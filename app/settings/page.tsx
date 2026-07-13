@@ -20,6 +20,9 @@ import {
   Building2,
   Settings,
   ShieldCheck,
+  ReceiptText,
+  KeyRound,
+  Activity,
 } from "lucide-react";
 import AdminShell from "@/components/AdminShell";
 import {
@@ -571,6 +574,36 @@ export default function SettingsPage() {
     () => getTenantPaymentMapping(currentOrganizationSettings),
     [currentOrganizationSettings]
   );
+  const profileCompletion = useMemo(() => {
+    const configured = [companyName, email, supportEmail, logoUrl].filter(
+      (value) => String(value || "").trim().length > 0
+    ).length;
+
+    return Math.round((configured / 4) * 100);
+  }, [companyName, email, supportEmail, logoUrl]);
+  const paymentCompletion = useMemo(() => {
+    const configured = [
+      bankName,
+      bankAccountName,
+      bankAccountNumber,
+      paymentInstructions,
+      rentDueDay,
+    ].filter((value) => String(value || "").trim().length > 0).length;
+
+    return Math.round((configured / 5) * 100);
+  }, [
+    bankName,
+    bankAccountName,
+    bankAccountNumber,
+    paymentInstructions,
+    rentDueDay,
+  ]);
+  const enabledAutomationCount = [
+    notifications,
+    maintenanceAlerts,
+    leaseReminders,
+    tenantAccessDefault,
+  ].filter(Boolean).length;
 
   if (checkingAuth) {
     return (
@@ -595,9 +628,13 @@ export default function SettingsPage() {
         <button
           onClick={handleSave}
           disabled={!canEditSettings || saving || loading}
-          className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-slate-950/10 transition hover:-translate-y-0.5 hover:bg-blue-700 disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-60 dark:bg-white dark:text-slate-950 dark:hover:bg-blue-100"
         >
-          <Save className="h-4 w-4" />
+          {saving ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Save className="h-4 w-4" />
+          )}
           {saving ? "Saving..." : "Save Settings"}
         </button>
       }
@@ -652,46 +689,70 @@ export default function SettingsPage() {
           </div>
         )}
 
-        <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-4 text-sm text-blue-700">
-          <div className="flex items-start gap-3">
-            <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />
-            <div>
-              <p className="font-semibold">Organization-secured settings</p>
-              <p className="mt-1">
-                Current Org ID:{" "}
-                <span className="font-mono">
-                  {user?.organizationId || "No organizationId"}
-                </span>
-              </p>
-            </div>
-          </div>
-        </div>
+        <SettingsHero
+          companyName={companyName || "The House Hub"}
+          profileCompletion={profileCompletion}
+          paymentCompletion={paymentCompletion}
+          enabledAutomationCount={enabledAutomationCount}
+          primaryColor={primaryColor}
+          organizationId={user?.organizationId || "No organizationId"}
+          canEditSettings={canEditSettings}
+        />
 
-        {isSuperAdmin && (
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-700">
-            <div className="flex items-start gap-3">
-              <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />
-              <div>
-                <p className="font-semibold">Read-only Super Admin mode</p>
-                <p className="mt-1">
-                  You can review organization settings and manage accounts, but
-                  operational settings are editable only by the connected Admin.
+        <div className={`grid gap-4 ${isSuperAdmin ? "lg:grid-cols-2" : ""}`}>
+          <div className="rounded-3xl border border-blue-100 bg-white p-5 shadow-sm shadow-slate-200/70 dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none">
+            <div className="flex items-start gap-4">
+              <div className="rounded-2xl bg-blue-50 p-3 text-blue-600 dark:bg-blue-500/10 dark:text-blue-300">
+                <ShieldCheck className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-bold text-slate-950 dark:text-white">
+                  Organization-secured settings
+                </p>
+                <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                  All changes stay scoped to this organization.
+                </p>
+                <p className="mt-3 truncate rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs text-emerald-700 dark:border-white/10 dark:bg-white/5 dark:text-emerald-300">
+                  {user?.organizationId || "No organizationId"}
                 </p>
               </div>
             </div>
           </div>
-        )}
+
+          {isSuperAdmin && (
+            <div className="rounded-3xl border border-amber-100 bg-white p-5 shadow-sm shadow-slate-200/70 dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none">
+              <div className="flex items-start gap-4">
+                <div className="rounded-2xl bg-amber-50 p-3 text-amber-600 dark:bg-amber-500/10 dark:text-amber-300">
+                  <ShieldCheck className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="font-bold text-slate-950 dark:text-white">
+                    Read-only Super Admin mode
+                  </p>
+                  <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                    You can review organization settings and manage accounts, but
+                    operational settings are editable only by the connected Admin.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
 
         {loading ? (
-          <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center text-slate-500 shadow-sm">
-            Loading settings...
+          <div className="rounded-[2rem] border border-slate-200 bg-white p-10 text-center text-slate-500 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-400">
+            <div className="mx-auto flex w-fit items-center gap-3 rounded-2xl bg-slate-50 px-5 py-4 dark:bg-white/5">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              Loading settings...
+            </div>
           </div>
         ) : (
-          <div className="grid gap-6 xl:grid-cols-3">
-            <div className="space-y-6 xl:col-span-2">
+          <div className="grid gap-6 xl:grid-cols-12">
+            <div className="space-y-6 xl:col-span-8">
               <SettingsCard
                 icon={<Building2 className="h-5 w-5" />}
                 title="Company Profile"
+                description="Identity and contact details used across admin and tenant surfaces."
                 color="blue"
               >
                 <div className="grid gap-4 md:grid-cols-2">
@@ -721,6 +782,7 @@ export default function SettingsPage() {
               <SettingsCard
                 icon={<Palette className="h-5 w-5" />}
                 title="Company Branding"
+                description="Visual identity used on tenant-facing payment pages."
                 color="indigo"
               >
                 <div className="grid gap-4 md:grid-cols-2">
@@ -743,8 +805,8 @@ export default function SettingsPage() {
                     autoComplete="email"
                   />
 
-                  <div className="md:col-span-2 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                  <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4 shadow-inner shadow-white md:col-span-2 dark:border-white/10 dark:bg-white/[0.03] dark:shadow-none">
+                    <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-100">
                       Primary Brand Color
                     </label>
                     <div className="flex items-center gap-3">
@@ -753,23 +815,23 @@ export default function SettingsPage() {
                         value={primaryColor}
                         disabled={!canEditSettings}
                         onChange={(e) => setPrimaryColor(e.target.value)}
-                        className="h-12 w-16 cursor-pointer rounded-xl border border-slate-200 bg-white"
+                        className="h-12 w-16 cursor-pointer rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-white/10"
                       />
                       <input
                         value={primaryColor}
                         disabled={!canEditSettings}
                         onChange={(e) => setPrimaryColor(e.target.value)}
-                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-70 dark:border-white/10 dark:bg-white/[0.04] dark:text-white dark:focus:ring-blue-500/20"
                       />
                     </div>
-                    <p className="mt-2 text-xs leading-5 text-slate-500">
+                    <p className="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
                       Hex color used for tenant payment branding and primary
                       interface accents.
                     </p>
 
                     {logoUrl && (
-                      <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
-                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      <div className="mt-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-slate-950/40">
+                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                           Logo Preview
                         </p>
                         <img
@@ -786,6 +848,7 @@ export default function SettingsPage() {
               <SettingsCard
                 icon={<CreditCard className="h-5 w-5" />}
                 title="Payment Settings"
+                description="Manual payment instructions mirrored directly on the tenant portal."
                 color="emerald"
               >
                 <div className="grid gap-4 md:grid-cols-2">
@@ -851,41 +914,41 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                <div className="mt-6 rounded-3xl border border-emerald-200 bg-emerald-50 p-5">
+                <div className="mt-6 rounded-[2rem] border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-blue-50 p-5 shadow-sm dark:border-emerald-400/20 dark:from-emerald-950/30 dark:via-white/[0.04] dark:to-blue-950/20">
                   <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div>
-                      <p className="text-sm font-bold uppercase tracking-wide text-emerald-700">
+                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
                         Tenant portal mapping
                       </p>
-                      <h4 className="mt-1 text-lg font-semibold text-slate-950">
+                      <h4 className="mt-1 text-lg font-bold text-slate-950 dark:text-white">
                         Owner configuration → tenant payment screen
                       </h4>
-                      <p className="mt-1 text-sm leading-6 text-emerald-900/70">
+                      <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
                         These values are read by `/tenant/payments` from the
                         same organization-scoped settings record.
                       </p>
                     </div>
-                    <div className="rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-emerald-700 shadow-sm">
+                    <div className="rounded-2xl border border-emerald-100 bg-white px-4 py-3 text-sm font-bold text-emerald-700 shadow-sm dark:border-white/10 dark:bg-white/10 dark:text-emerald-200">
                       Due: {formatRentDueDay(rentDueDay)}
                     </div>
                   </div>
 
-                  <div className="mt-5 grid gap-3">
+                  <div className="mt-5 grid gap-3 md:grid-cols-2">
                     {tenantPaymentPreview.map((item) => (
                       <div
                         key={item.label}
-                        className="rounded-2xl border border-emerald-100 bg-white p-4"
+                        className="rounded-3xl border border-white/80 bg-white/90 p-4 shadow-sm dark:border-white/10 dark:bg-slate-950/40"
                       >
-                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                        <div className="flex flex-col gap-3">
                           <div>
-                            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                            <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                               {item.label}
                             </p>
-                            <p className="mt-1 break-words text-sm font-semibold text-slate-900">
+                            <p className="mt-1 break-words text-sm font-bold text-slate-950 dark:text-white">
                               {item.ownerValue}
                             </p>
                           </div>
-                          <p className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                          <p className="w-fit rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-white/10 dark:text-slate-300">
                             {item.tenantLocation}
                           </p>
                         </div>
@@ -898,6 +961,7 @@ export default function SettingsPage() {
               <SettingsCard
                 icon={<Settings className="h-5 w-5" />}
                 title="System Preferences"
+                description="Regional defaults used by reports, reminders and payment display."
                 color="purple"
               >
                 <div className="grid gap-4 md:grid-cols-2">
@@ -924,6 +988,7 @@ export default function SettingsPage() {
               <SettingsCard
                 icon={<FileCheck className="h-5 w-5" />}
                 title="Document Settings"
+                description="Default tenant access behavior for document workflows."
                 color="emerald"
               >
                 <Toggle
@@ -941,6 +1006,7 @@ export default function SettingsPage() {
                   <SettingsCard
                     icon={<UserPlus className="h-5 w-5" />}
                     title="Super Admin — Create Accounts"
+                    description="Create operational accounts inside this organization."
                     color="indigo"
                   >
                     <form
@@ -1013,6 +1079,7 @@ export default function SettingsPage() {
                   <SettingsCard
                     icon={<UserCog className="h-5 w-5" />}
                     title="User Management"
+                    description="Review account access, status and organization scope."
                     color="sky"
                   >
                     {usersLoading ? (
@@ -1083,10 +1150,11 @@ export default function SettingsPage() {
               )}
             </div>
 
-            <div className="space-y-6">
+            <div className="space-y-6 xl:col-span-4">
               <SettingsCard
                 icon={<Bell className="h-5 w-5" />}
                 title="Notifications"
+                description="Email and operational alerts for this organization."
                 color="amber"
               >
                 <div className="space-y-4">
@@ -1116,6 +1184,7 @@ export default function SettingsPage() {
               <SettingsCard
                 icon={<Shield className="h-5 w-5" />}
                 title="Security"
+                description="Protect this admin account with a fresh password."
                 color="rose"
               >
                 <form onSubmit={handleChangePassword} className="space-y-4">
@@ -1187,6 +1256,7 @@ export default function SettingsPage() {
               <SettingsCard
                 icon={<Database className="h-5 w-5" />}
                 title="System Info"
+                description="Current platform health signals."
                 color="emerald"
               >
                 <div className="space-y-4">
@@ -1209,6 +1279,134 @@ export default function SettingsPage() {
         )}
       </div>
     </AdminShell>
+  );
+}
+
+function SettingsHero({
+  companyName,
+  profileCompletion,
+  paymentCompletion,
+  enabledAutomationCount,
+  primaryColor,
+  organizationId,
+  canEditSettings,
+}: {
+  companyName: string;
+  profileCompletion: number;
+  paymentCompletion: number;
+  enabledAutomationCount: number;
+  primaryColor: string;
+  organizationId: string;
+  canEditSettings: boolean;
+}) {
+  const accent = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(primaryColor)
+    ? primaryColor
+    : "#2563eb";
+
+  return (
+    <section className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm shadow-slate-200/80 dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none">
+      <div
+        className="relative p-6 sm:p-7"
+        style={{
+          background: `linear-gradient(135deg, ${accent}18, transparent 42%, rgba(16,185,129,0.12))`,
+        }}
+      >
+        <div className="absolute right-8 top-6 hidden h-28 w-28 rounded-full border border-white/70 bg-white/35 blur-2xl dark:border-white/10 dark:bg-white/10 md:block" />
+        <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-center">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/75 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-slate-600 shadow-sm dark:border-white/10 dark:bg-white/10 dark:text-slate-300">
+              <ShieldCheck className="h-4 w-4 text-emerald-600" />
+              Secure organization setup
+            </div>
+
+            <h3 className="mt-5 text-2xl font-black tracking-tight text-slate-950 dark:text-white sm:text-3xl">
+              {companyName}
+            </h3>
+            <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-600 dark:text-slate-300">
+              Central place for profile, tenant payment visibility, access
+              defaults, notifications and account security.
+            </p>
+
+            <div className="mt-5 flex flex-wrap gap-2">
+              <HeroPill
+                icon={<Activity className="h-4 w-4" />}
+                label={canEditSettings ? "Editable" : "Read-only"}
+              />
+              <HeroPill
+                icon={<KeyRound className="h-4 w-4" />}
+                label={`Org ${organizationId}`}
+                mono
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+            <HeroMetric
+              label="Profile"
+              value={`${profileCompletion}%`}
+              icon={<Building2 className="h-4 w-4" />}
+            />
+            <HeroMetric
+              label="Payment setup"
+              value={`${paymentCompletion}%`}
+              icon={<ReceiptText className="h-4 w-4" />}
+            />
+            <HeroMetric
+              label="Automations"
+              value={`${enabledAutomationCount}/4`}
+              icon={<Bell className="h-4 w-4" />}
+            />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function HeroPill({
+  icon,
+  label,
+  mono = false,
+}: {
+  icon: ReactNode;
+  label: string;
+  mono?: boolean;
+}) {
+  return (
+    <span
+      className={`inline-flex max-w-full items-center gap-2 rounded-full border border-slate-200 bg-white/85 px-3 py-2 text-xs font-bold text-slate-700 shadow-sm dark:border-white/10 dark:bg-white/10 dark:text-slate-200 ${
+        mono ? "font-mono" : ""
+      }`}
+    >
+      <span className="shrink-0 text-blue-600 dark:text-blue-300">{icon}</span>
+      <span className="truncate">{label}</span>
+    </span>
+  );
+}
+
+function HeroMetric({
+  label,
+  value,
+  icon,
+}: {
+  label: string;
+  value: string;
+  icon: ReactNode;
+}) {
+  return (
+    <div className="rounded-3xl border border-white/80 bg-white/85 p-4 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-950/40">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          {label}
+        </p>
+        <div className="rounded-2xl bg-blue-50 p-2 text-blue-600 dark:bg-blue-500/10 dark:text-blue-300">
+          {icon}
+        </div>
+      </div>
+      <p className="mt-3 text-2xl font-black text-slate-950 dark:text-white">
+        {value}
+      </p>
+    </div>
   );
 }
 
@@ -1242,7 +1440,7 @@ function Input({
   return (
     <div>
       {label && (
-        <label className="mb-2 block text-sm font-semibold text-slate-800">
+        <label className="mb-2 block text-sm font-bold text-slate-800 dark:text-slate-100">
           {label}
           {required && <span className="text-red-500"> *</span>}
         </label>
@@ -1258,9 +1456,13 @@ function Input({
         autoComplete={autoComplete}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-70 focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-100"
+        className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3.5 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-70 focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-100 dark:border-white/10 dark:bg-white/[0.04] dark:text-white dark:placeholder:text-slate-500 dark:focus:border-blue-400 dark:focus:bg-white/[0.07] dark:focus:ring-blue-500/20"
       />
-      {helper && <p className="mt-2 text-xs leading-5 text-slate-500">{helper}</p>}
+      {helper && (
+        <p className="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
+          {helper}
+        </p>
+      )}
     </div>
   );
 }
@@ -1284,7 +1486,7 @@ function TextareaField({
 }) {
   return (
     <div>
-      <label className="mb-2 block text-sm font-semibold text-slate-800">
+      <label className="mb-2 block text-sm font-bold text-slate-800 dark:text-slate-100">
         {label}
       </label>
       <textarea
@@ -1293,9 +1495,13 @@ function TextareaField({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         rows={rows}
-        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-70 focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-100"
+        className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3.5 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-70 focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-100 dark:border-white/10 dark:bg-white/[0.04] dark:text-white dark:placeholder:text-slate-500 dark:focus:border-blue-400 dark:focus:bg-white/[0.07] dark:focus:ring-blue-500/20"
       />
-      {helper && <p className="mt-2 text-xs leading-5 text-slate-500">{helper}</p>}
+      {helper && (
+        <p className="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
+          {helper}
+        </p>
+      )}
     </div>
   );
 }
@@ -1317,14 +1523,14 @@ function SelectField({
 }) {
   return (
     <div>
-      <label className="mb-2 block text-sm font-semibold text-slate-800">
+      <label className="mb-2 block text-sm font-bold text-slate-800 dark:text-slate-100">
         {label}
       </label>
       <select
         value={value}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-800 outline-none transition disabled:cursor-not-allowed disabled:opacity-70 focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-100"
+        className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3.5 text-sm font-medium text-slate-900 outline-none transition disabled:cursor-not-allowed disabled:opacity-70 focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-100 dark:border-white/10 dark:bg-white/[0.04] dark:text-white dark:focus:border-blue-400 dark:focus:bg-white/[0.07] dark:focus:ring-blue-500/20"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>
@@ -1332,7 +1538,11 @@ function SelectField({
           </option>
         ))}
       </select>
-      {helper && <p className="mt-2 text-xs leading-5 text-slate-500">{helper}</p>}
+      {helper && (
+        <p className="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
+          {helper}
+        </p>
+      )}
     </div>
   );
 }
@@ -1349,22 +1559,35 @@ function Toggle({
   disabled?: boolean;
 }) {
   return (
-    <label className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-      <span className="text-sm font-medium text-slate-700">{label}</span>
+    <label className="flex cursor-pointer items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3.5 transition hover:border-blue-200 hover:bg-white dark:border-white/10 dark:bg-white/[0.04] dark:hover:border-blue-400/30 dark:hover:bg-white/[0.07]">
+      <span className="text-sm font-bold text-slate-700 dark:text-slate-200">
+        {label}
+      </span>
       <input
         type="checkbox"
         checked={checked}
         disabled={disabled}
         onChange={onChange}
-        className="h-4 w-4"
+        className="peer sr-only"
       />
+      <span
+        className={`relative h-7 w-12 rounded-full transition ${
+          checked ? "bg-blue-600" : "bg-slate-300 dark:bg-slate-700"
+        } ${disabled ? "opacity-50" : ""}`}
+      >
+        <span
+          className={`absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow transition ${
+            checked ? "translate-x-5" : ""
+          }`}
+        />
+      </span>
     </label>
   );
 }
 
 function EmptyText({ text }: { text: string }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+    <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-sm text-slate-500 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-400">
       {text}
     </div>
   );
@@ -1373,11 +1596,13 @@ function EmptyText({ text }: { text: string }) {
 function SettingsCard({
   icon,
   title,
+  description,
   color,
   children,
 }: {
   icon: ReactNode;
   title: string;
+  description?: string;
   color:
     | "blue"
     | "purple"
@@ -1389,28 +1614,41 @@ function SettingsCard({
   children: ReactNode;
 }) {
   const colorClasses: Record<typeof color, string> = {
-    blue: "bg-blue-100 text-blue-600",
-    purple: "bg-purple-100 text-purple-600",
-    emerald: "bg-emerald-100 text-emerald-600",
-    indigo: "bg-indigo-100 text-indigo-600",
-    sky: "bg-sky-100 text-sky-600",
-    amber: "bg-amber-100 text-amber-600",
-    rose: "bg-rose-100 text-rose-600",
+    blue: "bg-blue-50 text-blue-600 ring-blue-100 dark:bg-blue-500/10 dark:text-blue-300 dark:ring-blue-400/20",
+    purple:
+      "bg-purple-50 text-purple-600 ring-purple-100 dark:bg-purple-500/10 dark:text-purple-300 dark:ring-purple-400/20",
+    emerald:
+      "bg-emerald-50 text-emerald-600 ring-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-400/20",
+    indigo:
+      "bg-indigo-50 text-indigo-600 ring-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-300 dark:ring-indigo-400/20",
+    sky: "bg-sky-50 text-sky-600 ring-sky-100 dark:bg-sky-500/10 dark:text-sky-300 dark:ring-sky-400/20",
+    amber:
+      "bg-amber-50 text-amber-600 ring-amber-100 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-400/20",
+    rose: "bg-rose-50 text-rose-600 ring-rose-100 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-400/20",
   };
 
   return (
-    <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-100 p-6">
-        <div className="flex items-center gap-3">
-          <div className={`rounded-2xl p-3 ${colorClasses[color]}`}>
+    <section className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm shadow-slate-200/70 transition dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none">
+      <div className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white p-5 dark:border-white/10 dark:from-white/[0.04] dark:to-transparent">
+        <div className="flex items-start gap-3">
+          <div className={`rounded-2xl p-3 ring-1 ${colorClasses[color]}`}>
             {icon}
           </div>
-          <h3 className="text-xl font-semibold text-slate-900">{title}</h3>
+          <div>
+            <h3 className="text-lg font-black text-slate-950 dark:text-white">
+              {title}
+            </h3>
+            {description && (
+              <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                {description}
+              </p>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="p-6">{children}</div>
-    </div>
+      <div className="p-5 sm:p-6">{children}</div>
+    </section>
   );
 }
 
@@ -1424,14 +1662,16 @@ function StatusRow({
   color: "green" | "blue" | "amber";
 }) {
   const colorClasses: Record<"green" | "blue" | "amber", string> = {
-    green: "bg-emerald-100 text-emerald-700",
-    blue: "bg-blue-100 text-blue-700",
-    amber: "bg-amber-100 text-amber-700",
+    green: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300",
+    blue: "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300",
+    amber: "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300",
   };
 
   return (
-    <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-      <span className="text-sm text-slate-600">{label}</span>
+    <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3.5 dark:border-white/10 dark:bg-white/[0.04]">
+      <span className="text-sm font-semibold text-slate-600 dark:text-slate-300">
+        {label}
+      </span>
       <span
         className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${colorClasses[color]}`}
       >
