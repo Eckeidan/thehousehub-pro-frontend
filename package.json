@@ -6,7 +6,8 @@
     "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "backup:source": "node scripts/backup-source.js"
   },
   "dependencies": {
     "lucide-react": "^0.577.0",
